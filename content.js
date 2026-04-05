@@ -103,9 +103,6 @@
       if (result) {
         hoveredVideoUrl = result.url;
         hoveredElement = result.anchor;
-      } else {
-        hoveredVideoUrl = null;
-        hoveredElement = null;
       }
     },
     true

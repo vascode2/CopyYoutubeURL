@@ -21,9 +21,11 @@ $!c:: {
     if !WinWaitActive(hwnd,, 2)
         return
     Sleep(150)
+    ; Nudge mouse to trigger mousemove/mouseover, then wait for extension to process
     MouseMove(5, 0,, "R")
-    Sleep(50)
+    Sleep(100)
     MouseMove(-5, 0,, "R")
-    Sleep(300)
-    SendInput("!c")
+    Sleep(200)
+    ; Send Alt+C with explicit key events to ensure the browser receives it
+    SendEvent("{Alt down}c{Alt up}")
 }
