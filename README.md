@@ -57,9 +57,11 @@ A simple remap: **Alt+V** sends **Ctrl+V**. This lets you paste the copied URL w
 1. Install [AutoHotkey v2](https://www.autohotkey.com/) if you don't have it
 2. Double-click `copy.ahk` to run the global copy hotkey
 3. Double-click `paste.ahk` to run the global paste hotkey
-4. (Optional) Add both `.ahk` files to your Startup folder so they run automatically:
-   - Press `Win+R`, type `shell:startup`, press Enter
-   - Create shortcuts to `copy.ahk` and `paste.ahk` in that folder
+4. **Auto-start on boot:** Copy `copy.ahk` and `paste.ahk` (or shortcuts to them) into:
+   ```
+   C:\Users\<YourUsername>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+   ```
+   Or press `Win+R`, type `shell:startup`, press Enter, and place them there. Both scripts will now launch automatically when Windows starts.
 
 ## Files
 
