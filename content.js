@@ -32,19 +32,53 @@
 
   /**
    * Walk up the DOM from an element to find the closest <a> with a video href.
-   * Stops after 15 ancestors to stay performant.
+   * If the direct ancestor walk fails (e.g. YouTube's hover preview overlay is
+   * a sibling of the <a>, not a child), fall back to finding the nearest
+   * renderer/thumbnail container and searching within it.
    */
   function findVideoAnchor(el) {
     let current = el;
     let depth = 0;
-    while (current && depth < 15) {
+    let container = null;
+
+    while (current && depth < 20) {
+      // Direct ancestor match
       if (current.tagName === "A" && current.href) {
         const clean = extractVideoUrl(current.href);
         if (clean) return { anchor: current, url: clean };
       }
+
+      // Remember the closest thumbnail/renderer container for fallback
+      if (!container) {
+        const tag = current.tagName?.toLowerCase() || "";
+        if (
+          tag === "ytd-thumbnail" ||
+          tag === "ytd-rich-item-renderer" ||
+          tag === "ytd-compact-video-renderer" ||
+          tag === "ytd-grid-video-renderer" ||
+          tag === "ytd-video-renderer" ||
+          tag === "ytd-rich-grid-media" ||
+          tag === "ytd-playlist-video-renderer"
+        ) {
+          container = current;
+        }
+      }
+
       current = current.parentElement;
       depth++;
     }
+
+    // Fallback: search within the container for a video link
+    if (container) {
+      const link = container.querySelector(
+        'a#thumbnail[href], a[href*="/watch?v="], a[href*="/shorts/"]'
+      );
+      if (link && link.href) {
+        const clean = extractVideoUrl(link.href);
+        if (clean) return { anchor: link, url: clean };
+      }
+    }
+
     return null;
   }
 
