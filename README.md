@@ -1,35 +1,78 @@
-# CopyURL - YouTube Thumbnail URL Copier
+# CopyURL — YouTube Thumbnail URL Copier
 
-A lightweight Chrome/Brave extension that lets you copy a YouTube video's URL by hovering over its thumbnail and pressing **Alt+C** — no need to open the video.
+Copy any YouTube video URL just by hovering over its thumbnail and pressing **Alt+C** — even when the browser isn't focused.
 
-## Why I Made This
+## Why This Exists
 
-I frequently paste YouTube URLs into Gemini to get video summaries. Opening every video just to grab the URL was tedious and slow. With this extension, I hover over a thumbnail, press a shortcut, and paste the URL straight into Gemini — skipping the video entirely.
+I paste YouTube URLs into Gemini to get video summaries. Opening every video just to grab the URL was tedious. I wanted to hover over a thumbnail, press a shortcut, and paste the URL straight into Gemini — without switching windows manually.
 
-## How to Use
+## How It Works
 
-1. Browse YouTube as usual (home feed, search results, channel pages, etc.)
-2. **Hover** your mouse over any video thumbnail
-3. Press **Alt+C**
-4. A small "Copied!" toast confirms the URL is in your clipboard
-5. Paste the clean URL wherever you need it (e.g., Gemini for a summary)
+The project has two parts that work together:
 
-The copied URL is always in clean format: `https://www.youtube.com/watch?v=VIDEO_ID` — no tracking parameters, no extra clutter.
+### 1. Browser Extension (Brave/Chrome)
 
-YouTube Shorts thumbnails are also supported and normalized to the standard `/watch?v=` format.
+A content script (`content.js`) runs on every YouTube page. It tracks which video thumbnail your mouse is hovering over. When you press **Alt+C** while hovering, it copies the clean URL to your clipboard and shows a small "Copied!" toast.
+
+The copied URL is always clean: `https://www.youtube.com/watch?v=VIDEO_ID` — no tracking parameters, no clutter. YouTube Shorts are normalized to the same format.
+
+### 2. AutoHotkey Script — Global Copy (`copy.ahk`)
+
+The browser extension only receives keyboard events when the browser is focused. If you're in another app (e.g., Gemini, VS Code) with your mouse hovering over a YouTube thumbnail in Brave, Alt+C wouldn't reach the extension.
+
+`copy.ahk` solves this. It intercepts **Alt+C globally** at the system level, then:
+
+1. Finds the actual Brave browser window (skipping background renderer processes)
+2. Activates/focuses Brave
+3. Nudges the mouse by a few pixels to trigger hover detection in the extension
+4. Sends Alt+C to the now-focused browser
+5. The extension picks it up and copies the URL
+
+This all happens in under 500ms — it feels instant.
+
+### 3. AutoHotkey Script — Global Paste (`paste.ahk`)
+
+A simple remap: **Alt+V** sends **Ctrl+V**. This lets you paste the copied URL with Alt+V from anywhere, matching the Alt+C copy shortcut.
+
+## Workflow
+
+1. Have YouTube open in Brave
+2. Work in any other app (Gemini, VS Code, etc.)
+3. Hover your mouse over a YouTube thumbnail in Brave
+4. Press **Alt+C** — Brave briefly activates, copies the URL, shows "Copied!"
+5. Press **Alt+V** (or Ctrl+V) to paste the clean URL wherever you need it
 
 ## Installation
 
-1. Download or clone this repository
-2. Open **Brave** (or Chrome): go to `brave://extensions` (or `chrome://extensions`)
+### Browser Extension
+
+1. Clone or download this repository
+2. Open Brave: go to `brave://extensions` (or `chrome://extensions` for Chrome)
 3. Enable **Developer mode** (toggle in the top-right corner)
-4. Click **Load unpacked** and select the `CopyURL` folder
-5. Done — the extension is now active on YouTube
+4. Click **Load unpacked** and select this folder
+5. The extension is now active on all YouTube pages
+
+### AutoHotkey Scripts (Windows)
+
+1. Install [AutoHotkey v2](https://www.autohotkey.com/) if you don't have it
+2. Double-click `copy.ahk` to run the global copy hotkey
+3. Double-click `paste.ahk` to run the global paste hotkey
+4. (Optional) Add both `.ahk` files to your Startup folder so they run automatically:
+   - Press `Win+R`, type `shell:startup`, press Enter
+   - Create shortcuts to `copy.ahk` and `paste.ahk` in that folder
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `manifest.json` | Extension configuration (Manifest V3) |
-| `content.js` | Core logic: hover detection, keyboard shortcut, clipboard copy, toast UI |
+| `manifest.json` | Extension config (Manifest V3) |
+| `content.js` | Hover detection, Alt+C handler, clipboard copy, toast UI |
+| `copy.ahk` | AHK v2 — global Alt+C: focus Brave, nudge mouse, forward keystroke |
+| `paste.ahk` | AHK v1 — global Alt+V → Ctrl+V paste remap |
 | `icon*.png` | Extension icons |
+
+## Requirements
+
+- **Browser:** Brave or Chrome
+- **OS:** Windows (for AutoHotkey scripts)
+- **AutoHotkey v2** (for `copy.ahk`)

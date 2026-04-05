@@ -97,6 +97,21 @@
   );
 
   document.addEventListener(
+    "mousemove",
+    (e) => {
+      const result = findVideoAnchor(e.target);
+      if (result) {
+        hoveredVideoUrl = result.url;
+        hoveredElement = result.anchor;
+      } else {
+        hoveredVideoUrl = null;
+        hoveredElement = null;
+      }
+    },
+    true
+  );
+
+  document.addEventListener(
     "mouseout",
     (e) => {
       // Only clear if we're leaving the tracked anchor (or its children)
