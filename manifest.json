@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CopyURL - YouTube Thumbnail URL Copier",
   "version": "1.0.0",
-  "description": "Hover over a YouTube video thumbnail and press Alt+C to copy its clean URL.",
+  "description": "Hover over a YouTube video thumbnail and press Alt+X to copy its clean URL.",
   "permissions": ["clipboardWrite"],
   "content_scripts": [
     {

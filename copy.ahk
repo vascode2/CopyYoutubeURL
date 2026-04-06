@@ -13,7 +13,7 @@ FindBraveWindow() {
     return 0
 }
 
-$!c:: {
+$!x:: {
     hwnd := FindBraveWindow()
     if !hwnd
         return
@@ -29,5 +29,5 @@ $!c:: {
     MouseMove(-5, 0,, "R")
     Sleep(200)
     ; Send Alt+C with explicit key events to ensure the browser receives it
-    SendEvent("{Alt down}c{Alt up}")
+    SendEvent("{Alt down}x{Alt up}")
 }

@@ -120,12 +120,12 @@
     true
   );
 
-  // --- Keyboard shortcut: Alt+C ---
+  // --- Keyboard shortcut: Alt+X ---
 
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.altKey && (e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      if (e.altKey && (e.key === "x" || e.key === "X") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         if (!hoveredVideoUrl) return;
 
         e.preventDefault();

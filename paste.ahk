@@ -1,1 +1,1 @@
-!v::Send ^v
+!z::Send ^v
