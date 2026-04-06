@@ -20,6 +20,22 @@ $!x:: {
     WinActivate(hwnd)
     if !WinWaitActive(hwnd,, 2)
         return
+    SendInput("{Escape}")
+    Sleep(150)
+    MouseMove(5, 0,, "R")
+    Sleep(100)
+    MouseMove(-5, 0,, "R")
+    Sleep(200)
+    SendEvent("{Alt down}x{Alt up}")
+}
+
+$!c:: {
+    hwnd := FindBraveWindow()
+    if !hwnd
+        return
+    WinActivate(hwnd)
+    if !WinWaitActive(hwnd,, 2)
+        return
     ; Escape defocuses the URL bar so keystrokes reach the page content script
     SendInput("{Escape}")
     Sleep(150)
@@ -28,6 +44,18 @@ $!x:: {
     Sleep(100)
     MouseMove(-5, 0,, "R")
     Sleep(200)
-    ; Send Alt+C with explicit key events to ensure the browser receives it
+    ; Send Alt+X to trigger the content script copy
     SendEvent("{Alt down}x{Alt up}")
+    ; Wait for clipboard to be updated
+    Sleep(300)
+    ; Alt+Tab back to the previously focused window
+    SendInput("{Alt down}{Tab}{Alt up}")
+    Sleep(200)
+    ; Paste
+    SendInput("^v")
+    Sleep(100)
+    ; Hit Enter
+    SendInput("{Enter}")
 }
+
+!z::Send("^v")
