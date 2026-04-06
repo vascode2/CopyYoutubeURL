@@ -20,6 +20,8 @@ $!c:: {
     WinActivate(hwnd)
     if !WinWaitActive(hwnd,, 2)
         return
+    ; Escape defocuses the URL bar so keystrokes reach the page content script
+    SendInput("{Escape}")
     Sleep(150)
     ; Nudge mouse to trigger mousemove/mouseover, then wait for extension to process
     MouseMove(5, 0,, "R")
