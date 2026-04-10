@@ -3,6 +3,19 @@
 
   let hoveredVideoUrl = null;
   let hoveredElement = null;
+  let lastClientX = -1;
+  let lastClientY = -1;
+
+  function refreshHoverFromLastPointer() {
+    if (lastClientX < 0 || lastClientY < 0) return;
+    const el = document.elementFromPoint(lastClientX, lastClientY);
+    if (!el) return;
+    const result = findVideoAnchor(el);
+    if (result) {
+      hoveredVideoUrl = result.url;
+      hoveredElement = result.anchor;
+    }
+  }
 
   /**
    * Extract a clean YouTube video URL from an anchor element's href.
@@ -85,6 +98,15 @@
   // --- Hover tracking via event delegation on document ---
 
   document.addEventListener(
+    "pointermove",
+    (e) => {
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+    },
+    true
+  );
+
+  document.addEventListener(
     "mouseover",
     (e) => {
       const result = findVideoAnchor(e.target);
@@ -107,6 +129,15 @@
     },
     true
   );
+
+  window.addEventListener("focus", () => {
+    requestAnimationFrame(() => refreshHoverFromLastPointer());
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible")
+      requestAnimationFrame(() => refreshHoverFromLastPointer());
+  });
 
   document.addEventListener(
     "mouseout",
