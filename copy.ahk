@@ -1,5 +1,12 @@
 #Requires AutoHotkey v2.0
 
+; Gemini "Ask Gemini" composer click (fractions of Chrome PWA client size). Nudge if the click hits Tools/+ instead of the text field.
+kGeminiInputXFrac := 0.5
+kGeminiInputYFrac := 0.92
+
+; Text before the URL in Gemini (Alt+C). "" = URL only. Clipboard is restored to the plain URL after send.
+kGeminiPastePrefix := "Summarize this YouTube video:`n"
+
 FindBraveWindow() {
     allWins := WinGetList("ahk_exe brave.exe")
     for index, hwnd in allWins {
@@ -7,6 +14,19 @@ FindBraveWindow() {
         cls := WinGetClass(hwnd)
         visible := DllCall("IsWindowVisible", "Ptr", hwnd)
         if (visible && cls = "Chrome_WidgetWin_1" && title != "") {
+            return hwnd
+        }
+    }
+    return 0
+}
+
+FindGeminiWindow() {
+    allWins := WinGetList("ahk_exe chrome.exe")
+    for index, hwnd in allWins {
+        title := WinGetTitle(hwnd)
+        cls := WinGetClass(hwnd)
+        visible := DllCall("IsWindowVisible", "Ptr", hwnd)
+        if (visible && cls = "Chrome_WidgetWin_1" && title != "" && InStr(title, "Gemini")) {
             return hwnd
         }
     }
@@ -48,14 +68,31 @@ $!c:: {
     SendEvent("{Alt down}x{Alt up}")
     ; Wait for clipboard to be updated
     Sleep(300)
-    ; Alt+Tab back to the previously focused window
-    SendInput("{Alt down}{Tab}{Alt up}")
-    Sleep(200)
-    ; Paste
+    clipUrl := A_Clipboard
+    if (kGeminiPastePrefix != "")
+        A_Clipboard := kGeminiPastePrefix . clipUrl
+    gemHwnd := FindGeminiWindow()
+    if !gemHwnd {
+        A_Clipboard := clipUrl
+        return
+    }
+    WinActivate(gemHwnd)
+    if !WinWaitActive(gemHwnd,, 2) {
+        A_Clipboard := clipUrl
+        return
+    }
+    Sleep(300)
+    CoordMode "Mouse", "Client"
+    WinGetClientPos(&cx, &cy, &cw, &ch, gemHwnd)
+    Click(Round(cw * kGeminiInputXFrac), Round(ch * kGeminiInputYFrac))
+    Sleep(150)
+    if (kGeminiPastePrefix != "")
+        Sleep(50)
     SendInput("^v")
     Sleep(100)
-    ; Hit Enter
     SendInput("{Enter}")
+    A_Clipboard := clipUrl
+    CoordMode "Mouse", "Screen"
 }
 
 !z::Send("^v")
