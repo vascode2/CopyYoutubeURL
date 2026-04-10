@@ -1,73 +1,70 @@
-# CopyURL — YouTube thumbnail → clipboard (and Gemini on Windows)
+# CopyURL — YouTube thumbnail → Gemini (Windows)
 
 ## Workflow
 
 1. Open **YouTube** in **Google Chrome** (or **Brave**) with this extension enabled.
 2. Point at the **thumbnail** of the video you care about — the extension remembers which video that is.
-3. Press **Alt+C** (with **AutoHotkey** and `copy.ahk` running on Windows). The script briefly brings the YouTube window forward, copies that video’s **YouTube URL** into the clipboard, switches to the **Gemini** app, drops your message into the chat (a short “summarize” line plus the link), and sends it.
-4. **Gemini** replies with a **summary** (and can go deeper if you follow up in the same chat).
+3. Press **Alt+Z** (with **AutoHotkey v2** and **`copy.ahk`** on Windows). The script briefly brings the YouTube window forward, copies that video’s **YouTube URL**, switches to the **Gemini** app, pastes a short “summarize” line plus the link, and sends it. Afterward the **clipboard is set back to the plain URL**. Your **physical mouse is not moved** (posted window messages to Chromium).
+4. **Gemini** replies with a **summary** (and you can follow up in the same chat).
 
-**Why this works:** **Gemini** can use a **YouTube URL** as real context — it can lean on the video itself for summaries and Q&A. Many other assistants only see the link as text and cannot watch or ground answers on the actual video the same way, so this shortcut is built around **Gemini** + link paste.
+**Why this works:** **Gemini** can use a **YouTube URL** as real video context for summaries and Q&A. Many other assistants only treat links as plain text.
 
-On **Windows**, **Alt+X** / **Alt+C** / **Alt+Z** are global: you do not have to click the YouTube window first. **Alt+C** uses posted window messages to focus Gemini’s composer **without moving your physical mouse**.
+**Implementation note:** `copy.ahk` sends **Alt+X** *inside* the YouTube tab so the extension can copy the URL; you do not use **Alt+X** as a separate global shortcut anymore.
 
 | Hotkey | Action |
 |--------|--------|
-| **Alt+X** | Copy the hovered video’s YouTube URL only |
-| **Alt+C** | Copy URL → Gemini app → paste prompt + URL → Enter |
-| **Alt+Z** | Send Ctrl+V |
+| **Alt+Z** | Copy hovered URL from YouTube (Brave) → Gemini (Chrome app) → paste prompt + URL → Enter |
 
 ---
 
 ## Requirements
 
-- **Brave** — primary choice called out here; **Google Chrome** is a **supported alternative** for installing the extension and using YouTube the same way.
-- **Windows** + **[AutoHotkey v2](https://www.autohotkey.com/)** + **`copy.ahk`** for global **Alt+X** / **Alt+C** / **Alt+Z**.
-- **Google Chrome** with **Gemini installed as an app** (window title contains `Gemini`) for the **Alt+C** step that opens Gemini.
+- **Brave** (default in `copy.ahk`) or **Google Chrome** as an alternative for YouTube and this extension.
+- **Windows** + **[AutoHotkey v2](https://www.autohotkey.com/)** + **`copy.ahk`** for global **Alt+Z**.
+- **Google Chrome** with **Gemini installed as an app** (window title contains `Gemini`).
 
-**Script note:** `copy.ahk` looks for **Brave** (`brave.exe`) when it activates the browser for the copy. If YouTube runs only in **Chrome**, change `FindBraveWindow` in `copy.ahk` to match `chrome.exe` (same window class checks as today).
+**Script notes:** `copy.ahk` activates **Brave** (`brave.exe`) for the YouTube step; switch to **`chrome.exe`** in `FindBraveWindow` if YouTube lives only in Chrome. Edit **`kGeminiPastePrefix`** at the top of `copy.ahk` to change or clear the text before the URL (`""` = URL only).
 
-On **macOS** / **Linux** you can still load the extension and press **Alt+X** on a **focused** YouTube tab; global hotkeys and **Alt+C** are **not** available there.
+This flow is **Windows-only**. There is no global hotkey on **macOS** / **Linux** in this repo.
 
 ---
 
 ## 1. Load the extension in Google Chrome
 
 1. Download or clone this repository.
-2. Open **Google Chrome** (or **Brave** if you use it for YouTube).
+2. Open **Google Chrome** (or **Brave**).
 3. Go to **`chrome://extensions`** (Brave: **`brave://extensions`**).
 4. Turn **Developer mode** on (top right).
-5. Click **Load unpacked** and select this folder (the one that contains `manifest.json`).
-6. Open [YouTube](https://www.youtube.com) in that browser and allow the extension on the site if asked.
+5. Click **Load unpacked** and select this folder (`manifest.json` lives here).
+6. Open [YouTube](https://www.youtube.com) and allow the extension if prompted.
 
 ---
 
 ## 2. Install AutoHotkey v2 and run `copy.ahk`
 
 1. Install **AutoHotkey v2** from [autohotkey.com](https://www.autohotkey.com/).
-2. Double-click **`copy.ahk`** in this repo folder.
-3. Confirm the **H** icon appears in the system tray.
-4. **Optional — run at sign-in:** **Win+R** → type **`shell:startup`** → Enter → add a **shortcut** to `copy.ahk`.
+2. Double-click **`copy.ahk`** in this repo.
+3. Confirm the **H** tray icon appears.
+4. **Optional — run at sign-in:** **Win+R** → **`shell:startup`** → Enter → shortcut to `copy.ahk`.
 
-After editing `copy.ahk`, reload it from the tray icon (**Reload Script**).
+Reload the script after editing `copy.ahk` (tray → **Reload Script**).
 
 ---
 
-## 3. Install Gemini as a Chrome app (for Alt+C)
+## 3. Install Gemini as a Chrome app
 
-**Alt+C** expects a normal Chrome window whose title includes **`Gemini`**. Installing the **PWA** is more reliable than a loose tab.
+**Alt+Z** expects a Chrome window whose title includes **`Gemini`**. The installed **PWA** is most reliable.
 
 1. Open **Google Chrome**.
 2. Go to [gemini.google.com](https://gemini.google.com) and sign in.
-3. Install: **install** icon in the address bar, or **⋮** → **Save and share** → **Install Gemini** (wording may vary).
-4. Use the installed app window when you run **Alt+C**.
+3. Install via the address bar **install** icon, or **⋮** → **Save and share** → **Install Gemini** (labels vary).
+4. Keep that app window available when you use **Alt+Z**.
 
 ---
 
 ## Usage
 
-1. Keep **YouTube** open in **Chrome** (or **Brave**) so your pointer can sit over a thumbnail.
-2. Hover the thumbnail you want.
-3. **Alt+X** — copy only. **Alt+C** — copy and send to Gemini as above. **Alt+Z** — paste hotkey (Ctrl+V).
+1. **YouTube** open in **Chrome** or **Brave**; pointer over a thumbnail.
+2. **Alt+Z** — full flow above.
 
-If several Gemini windows are open, AutoHotkey uses the first one it finds; one window is simplest.
+If several Gemini windows are open, AutoHotkey uses the first match; one window is simplest.

@@ -4,7 +4,7 @@
 kGeminiInputXFrac := 0.5
 kGeminiInputYFrac := 0.92
 
-; Text before the URL in Gemini (Alt+C). "" = URL only. Clipboard is restored to the plain URL after send.
+; Text before the URL in Gemini (Alt+Z). "" = URL only. Clipboard is restored to the plain URL after send.
 kGeminiPastePrefix := "Summarize this YouTube video:`n"
 
 WM_MOUSEMOVE := 0x200
@@ -137,21 +137,7 @@ FocusGeminiComposer(topHwnd, xFrac, yFrac) {
     return true
 }
 
-$!x:: {
-    hwnd := FindBraveWindow()
-    if !hwnd
-        return
-    WinActivate(hwnd)
-    if !WinWaitActive(hwnd,, 2)
-        return
-    SendInput("{Escape}")
-    Sleep(150)
-    SyncChromiumHoverAtCursor(hwnd)
-    Sleep(200)
-    SendEvent("{Alt down}x{Alt up}")
-}
-
-$!c:: {
+$!z:: {
     hwnd := FindBraveWindow()
     if !hwnd
         return
@@ -187,5 +173,3 @@ $!c:: {
     SendInput("{Enter}")
     A_Clipboard := clipUrl
 }
-
-!z::Send("^v")

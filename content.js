@@ -151,7 +151,7 @@
     true
   );
 
-  // --- Keyboard shortcut: Alt+X ---
+  // Alt+X: used by copy.ahk (SendEvent) after it focuses YouTube — not a separate global shortcut.
 
   document.addEventListener(
     "keydown",
