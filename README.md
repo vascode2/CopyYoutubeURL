@@ -1,6 +1,6 @@
 # CopyURL — YouTube thumbnail → Gemini (Windows)
 
-![Workflow demo (stylized, not a screen recording)](docs/workflow-demo.gif)
+![Workflow demo — red text on white (not a screen recording)](docs/workflow-demo.gif)
 
 ## Workflow
 
