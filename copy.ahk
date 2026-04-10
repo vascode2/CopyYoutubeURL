@@ -119,6 +119,29 @@ SyncChromiumHoverAtCursor(topHwnd) {
     return PostMouseMoveAtCursor(render)
 }
 
+ClipboardSequence() {
+    return DllCall("GetClipboardSequenceNumber", "UInt")
+}
+
+/**
+ * Wait until the OS clipboard changes (extension finished writing). Avoids reading a stale URL
+ * while navigator.clipboard.writeText is still pending, or general race with Sleep(300).
+ */
+WaitForClipboardUpdate(seqBefore, timeoutMs := 4000) {
+    deadline := A_TickCount + timeoutMs
+    Loop {
+        if (ClipboardSequence() != seqBefore)
+            return true
+        if (A_TickCount >= deadline)
+            return false
+        Sleep(30)
+    }
+}
+
+ClipboardTextLooksLikeYouTubeUrl(s) {
+    return InStr(s, "youtube.com") && (InStr(s, "watch?v=") || InStr(s, "youtu.be/"))
+}
+
 FocusGeminiComposer(topHwnd, xFrac, yFrac) {
     render := ChromeLargestRenderHwnd(topHwnd)
     if !render
@@ -148,9 +171,18 @@ $!z:: {
     Sleep(150)
     SyncChromiumHoverAtCursor(hwnd)
     Sleep(200)
+    seqBefore := ClipboardSequence()
     SendEvent("{Alt down}x{Alt up}")
-    Sleep(300)
+    if !WaitForClipboardUpdate(seqBefore) {
+        TrayTip("YouTube copy timed out — clipboard did not update.", "CopyURL")
+        return
+    }
+    Sleep(80)
     clipUrl := A_Clipboard
+    if !ClipboardTextLooksLikeYouTubeUrl(clipUrl) {
+        TrayTip("Clipboard does not look like a YouTube URL — copy may have failed.", "CopyURL")
+        return
+    }
     if (kGeminiPastePrefix != "")
         A_Clipboard := kGeminiPastePrefix . clipUrl
     gemHwnd := FindGeminiWindow()

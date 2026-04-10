@@ -162,30 +162,46 @@
         e.preventDefault();
         e.stopPropagation();
 
-        navigator.clipboard.writeText(hoveredVideoUrl).then(() => {
+        // Synchronous copy first: navigator.clipboard.writeText is async and AutoHotkey often
+        // reads the clipboard before the promise resolves, pasting a stale URL into Gemini.
+        if (copyViaExecCommand(hoveredVideoUrl)) {
           showToast(hoveredElement, "Copied!");
-        }).catch(() => {
-          // Fallback: use execCommand for older contexts / when clipboard API is blocked
-          fallbackCopy(hoveredVideoUrl);
-          showToast(hoveredElement, "Copied!");
-        });
+          return;
+        }
+        void navigator.clipboard
+          .writeText(hoveredVideoUrl)
+          .then(() => showToast(hoveredElement, "Copied!"))
+          .catch(() => {
+            showToast(hoveredElement, "Copy failed");
+          });
       }
     },
     true
   );
 
   /**
-   * Fallback copy using a temporary textarea + document.execCommand.
+   * Synchronous clipboard write (execCommand). Returns true if the command reported success.
+   * Required for reliable handoff to external automation that polls the OS clipboard.
    */
-  function fallbackCopy(text) {
+  function copyViaExecCommand(text) {
     const ta = document.createElement("textarea");
     ta.value = text;
+    ta.setAttribute("readonly", "");
     ta.style.position = "fixed";
     ta.style.left = "-9999px";
+    ta.style.top = "0";
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
-    document.execCommand("copy");
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
     ta.remove();
+    return ok;
   }
 
   /**

@@ -11,7 +11,7 @@
 
 **Why this works:** **Gemini** can use a **YouTube URL** as real video context for summaries and Q&A. Many other assistants only treat links as plain text.
 
-**Implementation note:** `copy.ahk` sends **Alt+X** *inside* the YouTube tab so the extension can copy the URL; you do not use **Alt+X** as a separate global shortcut anymore.
+**Implementation note:** `copy.ahk` sends **Alt+X** *inside* the YouTube tab so the extension can copy the URL; you do not use **Alt+X** as a separate global shortcut anymore. The extension copies **synchronously** (`execCommand`) so the OS clipboard is ready before AutoHotkey continues; the script also waits for a **Windows clipboard update** before reading the URL, so Gemini should not receive a stale link.
 
 | Hotkey | Action |
 |--------|--------|
