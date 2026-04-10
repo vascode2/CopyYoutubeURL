@@ -1,5 +1,7 @@
 # CopyURL — YouTube thumbnail → Gemini (Windows)
 
+![Workflow demo (stylized, not a screen recording)](docs/workflow-demo.gif)
+
 ## Workflow
 
 1. Open **YouTube** in **Google Chrome** (or **Brave**) with this extension enabled.
@@ -48,6 +50,8 @@ This flow is **Windows-only**. There is no global hotkey on **macOS** / **Linux*
 4. **Optional — run at sign-in:** **Win+R** → **`shell:startup`** → Enter → shortcut to `copy.ahk`.
 
 Reload the script after editing `copy.ahk` (tray → **Reload Script**).
+
+To **regenerate** the demo GIF: `python scripts/generate_workflow_demo_gif.py` (requires `pillow` and `imageio`).
 
 ---
 
