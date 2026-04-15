@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CopyYoutubeURL &mdash; Built on Autopilot with Claude</title>
+  <style>
+    :root {
+      --bg:#0a0d14;--surface:#111827;--s2:#1a2235;--border:#1e2d45;
+      --text:#e2e8f0;--muted:#64748b;--subtle:#94a3b8;
+      --acc:#7c3aed;--cyan:#06b6d4;--grn:#10b981;--ylw:#f59e0b;--red:#ef4444;
+      --glow:rgba(124,58,237,.13);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+    #app{display:flex;height:100vh}
+    #sidebar{width:188px;min-width:188px;background:var(--surface);border-right:1px solid var(--border);padding:16px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto}
+    .sb-brand{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);padding:0 8px 11px;border-bottom:1px solid var(--border);margin-bottom:3px}
+    .sb-sec{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:9px 8px 3px}
+    .pbtn{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--subtle);cursor:pointer;font-size:12px;font-weight:500;width:100%;text-align:left;transition:all .15s}
+    .pbtn:hover{background:var(--s2);color:var(--text)}
+    .pbtn.active{background:var(--glow);color:var(--text);border-color:rgba(124,58,237,.3)}
+    .pbtn.active .dot{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+    .pbtn.done .dot{background:var(--grn)}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:all .2s}
+    .cnt{margin-left:auto;font-size:10px;color:var(--muted);background:var(--s2);padding:1px 5px;border-radius:10px}
+    .kb{display:inline-block;background:var(--s2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 6px;font-size:11px;color:var(--cyan);font-family:monospace}
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    #pbar{height:2px;background:var(--border);flex-shrink:0}
+    #pfill{height:100%;background:linear-gradient(90deg,var(--acc),var(--cyan));transition:width .4s ease}
+    #sarea{flex:1;overflow:hidden;position:relative}
+    .slide{position:absolute;inset:0;display:flex;flex-direction:column;padding:34px 48px 16px;opacity:0;transform:translateX(32px);transition:opacity .26s ease,transform .26s ease;pointer-events:none;overflow-y:auto}
+    .slide.active{opacity:1;transform:translateX(0);pointer-events:all}
+    .slide.exit{opacity:0;transform:translateX(-32px)}
+    .slide::-webkit-scrollbar{width:4px}
+    .slide::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+    .stag{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:7px;display:inline-flex;align-items:center;gap:5px}
+    .t0{color:var(--cyan)}.t1{color:var(--cyan)}.t2{color:var(--acc)}.t3{color:var(--ylw)}.t4{color:var(--red)}.t5{color:var(--grn)}.t6{color:#a78bfa}
+    .stitle{font-size:clamp(19px,2.8vw,30px);font-weight:800;line-height:1.15;letter-spacing:-.02em;margin-bottom:7px}
+    .ssub{font-size:13px;color:var(--subtle);margin-bottom:18px;line-height:1.55}
+    .tip{background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.22);border-left:3px solid var(--cyan);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:12.5px;line-height:1.55}
+    .tlabel{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:3px}
+    .box{border-radius:8px;padding:11px 14px;margin:8px 0;font-size:12.5px;line-height:1.55}
+    .bi{background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.2);border-left:3px solid var(--acc)}
+    .bb{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-left:3px solid var(--red)}
+    .bf{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-left:3px solid var(--grn)}
+    .bw{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-left:3px solid var(--ylw)}
+    .blabel{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+    .bi .blabel{color:var(--acc)}.bb .blabel{color:var(--red)}.bf .blabel{color:var(--grn)}.bw .blabel{color:var(--ylw)}
+    .cols{display:grid;gap:12px}.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}
+    .flow{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin:12px 0;justify-content:center}
+    .fn{background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-size:11px;font-weight:500;text-align:center;min-width:80px}
+    .fa{color:var(--acc);border-color:rgba(124,58,237,.4)}
+    .fc{color:var(--cyan);border-color:rgba(6,182,212,.4)}
+    .fg{color:var(--grn);border-color:rgba(16,185,129,.4)}
+    .fy{color:var(--ylw);border-color:rgba(245,158,11,.4)}
+    .arr{font-size:15px;color:var(--muted);padding:0 3px;flex-shrink:0}
+    .steps{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+    .step{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-size:12.5px}
+    .sn{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+    .sna{background:var(--acc);color:#fff}.snc{background:var(--cyan);color:#000}.sng{background:var(--grn);color:#000}.sny{background:var(--ylw);color:#000}.snr{background:var(--red);color:#fff}
+    .step b{font-weight:600;color:var(--text)}
+    .step small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
+    .tl{display:flex;flex-direction:column;gap:0;margin:10px 0;position:relative}
+    .tl::before{content:"";position:absolute;left:11px;top:20px;bottom:20px;width:2px;background:var(--border)}
+    .tl-item{display:flex;gap:14px;align-items:flex-start;padding:8px 0;position:relative}
+    .tl-dot{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;z-index:1;border:2px solid var(--bg)}
+    .tl-body{flex:1;padding-top:3px}
+    .tl-title{font-size:13px;font-weight:600;color:var(--text)}
+    .tl-sub{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5}
+    .stats{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+    .stat{flex:1;min-width:85px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px;text-align:center}
+    .snum2{font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--acc),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .slbl{font-size:10px;color:var(--muted);margin-top:2px}
+    .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.03em;margin-right:4px}
+    .pp{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+    .pc{background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+    .pg{background:rgba(16,185,129,.12);color:var(--grn);border:1px solid rgba(16,185,129,.3)}
+    .py{background:rgba(245,158,11,.12);color:var(--ylw);border:1px solid rgba(245,158,11,.3)}
+    .ldiag{display:grid;grid-template-columns:1fr 50px 1fr;align-items:center;gap:8px;margin:12px 0}
+    .lbox{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+    .lbox h4{font-size:12.5px;margin-bottom:3px}
+    .lbox p{color:var(--muted);font-size:11px;line-height:1.5}
+    .lmid{text-align:center;font-size:26px;color:var(--muted)}
+    .hero{flex:1;display:flex;flex-direction:column;justify-content:center}
+    .htitle{font-size:clamp(24px,4vw,46px);font-weight:800;letter-spacing:-.03em;line-height:1.1}
+    .hgrad{background:linear-gradient(135deg,#a78bfa,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hsub{font-size:14px;color:var(--subtle);margin-top:11px;max-width:520px;line-height:1.6}
+    code{background:rgba(124,58,237,.12);padding:.1em .4em;border-radius:4px;font-size:.88em;font-family:monospace}
+    .ptpl{background:#060a10;border:1px dashed rgba(124,58,237,.35);border-radius:8px;padding:11px 14px;margin:8px 0;font-size:12px;line-height:1.75;color:#c4b5fd;font-family:monospace}
+    .ptpl .ph{color:#4b5563;font-style:italic}
+    #nav{display:flex;align-items:center;justify-content:space-between;padding:11px 48px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
+    .nbtn{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:7px 15px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:500;transition:all .15s;font-family:inherit}
+    .nbtn:hover:not(:disabled){border-color:var(--acc);color:#a78bfa}
+    .nbtn:disabled{opacity:.3;cursor:not-allowed}
+    #slabel{font-size:12px;color:var(--subtle);text-align:center}
+    #sctr{font-size:11px;color:var(--muted);text-align:center;margin-top:1px}
+  </style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="sb-brand">Build Log</div>
+    <div class="sb-sec">Phases</div>
+    <button class="pbtn" data-phase="0" onclick="jumpToPhase(0)"><span class="dot"></span>Intro<span class="cnt">2</span></button>
+    <button class="pbtn" data-phase="1" onclick="jumpToPhase(1)"><span class="dot"></span>Plan<span class="cnt">2</span></button>
+    <button class="pbtn" data-phase="2" onclick="jumpToPhase(2)"><span class="dot"></span>Build<span class="cnt">3</span></button>
+    <button class="pbtn" data-phase="3" onclick="jumpToPhase(3)"><span class="dot"></span>Iterate<span class="cnt">3</span></button>
+    <button class="pbtn" data-phase="4" onclick="jumpToPhase(4)"><span class="dot"></span>Debug<span class="cnt">3</span></button>
+    <button class="pbtn" data-phase="5" onclick="jumpToPhase(5)"><span class="dot"></span>Polish<span class="cnt">2</span></button>
+    <button class="pbtn" data-phase="6" onclick="jumpToPhase(6)"><span class="dot"></span>Ship<span class="cnt">2</span></button>
+    <div class="sb-sec" style="margin-top:8px">Navigate</div>
+    <div style="padding:0 8px;font-size:11px;color:var(--muted);line-height:2">
+      <span class="kb">&#8592;</span> <span class="kb">&#8594;</span> arrows<br>
+      <span class="kb">Space</span> next
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="pbar"><div id="pfill" style="width:0%"></div></div>
+    <div id="sarea">
+
+
+<!-- SLIDE 0: Title -->
+<div class="slide active" data-phase="0">
+  <div class="hero">
+    <div style="margin-bottom:14px">
+      <span class="pill pp">Chrome Extension</span>
+      <span class="pill pc">AutoHotkey v2</span>
+      <span class="pill pg">Built with Claude in Cursor</span>
+    </div>
+    <div class="htitle">CopyYoutubeURL<br><span class="hgrad">Built on Autopilot</span></div>
+    <p class="hsub">A real walkthrough of how this project went from idea to shipped &mdash; using Claude in Cursor as the co-pilot for every decision, every fix, and every iteration.</p>
+    <div class="stats" style="margin-top:22px">
+      <div class="stat"><div class="snum2">3</div><div class="slbl">Source files</div></div>
+      <div class="stat"><div class="snum2">7+</div><div class="slbl">Iterations</div></div>
+      <div class="stat"><div class="snum2">3</div><div class="slbl">Bugs squashed</div></div>
+      <div class="stat"><div class="snum2">1</div><div class="slbl">Final hotkey</div></div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--muted)">Press <span class="kb">&#8594;</span> to start</div>
+</div>
+
+
+<!-- SLIDE 1: What is autopilot -->
+<div class="slide" data-phase="0">
+  <span class="stag t0">&#9670; Concept</span>
+  <h1 class="stitle">What "Full Autopilot" Looks Like in Practice</h1>
+  <p class="ssub">Not a single large prompt. A sustained back-and-forth across the whole project lifecycle.</p>
+  <div class="ldiag">
+    <div class="lbox" style="border-color:rgba(6,182,212,.35)">
+      <h4 style="color:var(--cyan)">&#128113; You</h4>
+      <p>Describe the goal<br>Test each piece<br>Report what breaks<br>Decide what to keep</p>
+    </div>
+    <div class="lmid">&#8644;</div>
+    <div class="lbox" style="border-color:rgba(124,58,237,.35)">
+      <h4 style="color:#a78bfa">&#129302; Claude</h4>
+      <p>Proposes architecture<br>Writes all the code<br>Explains trade-offs<br>Fixes what you report</p>
+    </div>
+  </div>
+  <div class="cols c2" style="margin-top:6px">
+    <div class="box bi">
+      <div class="blabel">Your only real job</div>
+      Give Claude a clear problem, test the output honestly, and describe failures precisely. The quality of your bug reports directly determines how fast things get fixed.
+    </div>
+    <div class="box bf">
+      <div class="blabel">What this project proves</div>
+      Every file &mdash; content.js, copy.ahk, manifest, README, demo GIF generator &mdash; was written by Claude. The human role was testing, feedback, and final approval.
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; The key mindset shift</div>
+    Stop thinking "what code do I write?" Start thinking "what outcome do I need, and how precisely can I describe it?"
+  </div>
+</div>
+
+
+<!-- SLIDE 2: The Problem -->
+<div class="slide" data-phase="1">
+  <span class="stag t1">&#9670; Phase 1 &mdash; Plan</span>
+  <h1 class="stitle">Step One: Define the Problem, Not the Solution</h1>
+  <p class="ssub">The prompt that started everything wasn't a technical spec &mdash; it was a user need with constraints.</p>
+  <div class="box bi" style="margin-bottom:14px">
+    <div class="blabel">&#128172; The goal given to Claude</div>
+    Hover a YouTube thumbnail in Brave, press one hotkey, and have that video's URL land in Gemini with a summarize prompt &mdash; automatically. The physical mouse must not move. Windows only.
+  </div>
+  <div class="cols c2">
+    <div class="steps">
+      <div class="step">
+        <div class="sn snc">&#10003;</div>
+        <div><b>Goal stated as an outcome</b><small>Not "build a Chrome extension" &mdash; "I want this to happen when I press a key."</small></div>
+      </div>
+      <div class="step">
+        <div class="sn snc">&#10003;</div>
+        <div><b>Platform spelled out upfront</b><small>Windows, Brave for YouTube, Chrome PWA for Gemini, AutoHotkey v2. All given before any code.</small></div>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="sn snc">&#10003;</div>
+        <div><b>One hard constraint named</b><small>"Mouse must not move" &mdash; this single requirement drove the entire PostMessage architecture.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn snc">&#10003;</div>
+        <div><b>Architecture requested before code</b><small>Claude proposed the two-component split before writing a single file.</small></div>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Template: starting a project with Claude</div>
+    <div class="ptpl">I want to <span class="ph">[outcome in plain language]</span>.
+Platform: <span class="ph">[OS, apps, versions]</span>
+Must not: <span class="ph">[hard constraint]</span>
+Out of scope: <span class="ph">[skip for now]</span>
+Propose the architecture first, before writing any code.</div>
+  </div>
+</div>
+
+
+<!-- SLIDE 3: Architecture -->
+<div class="slide" data-phase="1">
+  <span class="stag t1">&#9670; Phase 1 &mdash; Plan</span>
+  <h1 class="stitle">The Architecture Claude Proposed</h1>
+  <p class="ssub">Two components, cleanly separated. Each testable on its own. Reviewed and approved before any code was written.</p>
+  <div class="flow">
+    <div class="fn fc">YouTube Tab<br><span style="opacity:.6;font-size:10px">Brave/Chrome</span></div>
+    <div class="arr">&#8594;</div>
+    <div class="fn fa">Extension<br><span style="opacity:.6;font-size:10px">content.js</span></div>
+    <div class="arr">&#8594;</div>
+    <div class="fn fy">OS Clipboard<br><span style="opacity:.6;font-size:10px">sync write</span></div>
+    <div class="arr">&#8594;</div>
+    <div class="fn fa">AHK Script<br><span style="opacity:.6;font-size:10px">copy.ahk</span></div>
+    <div class="arr">&#8594;</div>
+    <div class="fn fg">Gemini App<br><span style="opacity:.6;font-size:10px">Chrome PWA</span></div>
+  </div>
+  <div class="cols c2" style="margin-top:6px">
+    <div class="box bi">
+      <div class="blabel">Component 1: The Extension</div>
+      Lives inside the YouTube tab. Tracks which thumbnail is hovered. On a trigger key sent by AHK, copies the clean URL to clipboard &mdash; synchronously.
+    </div>
+    <div class="box bi">
+      <div class="blabel">Component 2: The AHK Script</div>
+      Responds to the global hotkey. Orchestrates everything: activate YouTube, trigger the extension, wait for clipboard, activate Gemini, click composer, paste, send.
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Why review architecture before coding?</div>
+    Claude flagged the async clipboard timing problem <em>at this stage</em> &mdash; before writing a line. Catching design issues early costs nothing. Catching them after coding is expensive.
+  </div>
+</div>
+
+
+<!-- SLIDE 4: Build extension -->
+<div class="slide" data-phase="2">
+  <span class="stag t2">&#9670; Phase 2 &mdash; Build</span>
+  <h1 class="stitle">Build 1: The Chrome Extension</h1>
+  <p class="ssub">Claude wrote content.js and manifest.json. The extension handles everything inside the YouTube tab &mdash; nothing else.</p>
+  <div class="cols c2">
+    <div class="box bi">
+      <div class="blabel">What it does</div>
+      Tracks pointer position across the YouTube page continuously. When hovering a thumbnail, finds the underlying video link &mdash; even when YouTube's overlay elements obscure the direct path. On trigger, copies the clean URL and shows a toast.
+    </div>
+    <div class="box bi">
+      <div class="blabel">The tricky part Claude solved</div>
+      YouTube uses custom web components and hover-preview overlays that sit in front of the actual link. The extension walks up the DOM and, if the direct path fails, searches the nearest video container as a fallback. Covers regular videos, Shorts, playlists, sidebar.
+    </div>
+  </div>
+  <div class="box bw" style="margin-top:4px">
+    <div class="blabel">&#9654; First test at this stage</div>
+    Load the extension in Brave, open YouTube, hover thumbnails, press the trigger key. Confirm the "Copied!" toast appears and the right URL is in the clipboard &mdash; before writing the AHK script at all.
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Build and test one component at a time</div>
+    Don't wait until everything is written to test. Each component should be verified standalone first. This makes bugs much easier to locate.
+  </div>
+</div>
+
+
+<!-- SLIDE 5: Build copy.ahk -->
+<div class="slide" data-phase="2">
+  <span class="stag t2">&#9670; Phase 2 &mdash; Build</span>
+  <h1 class="stitle">Build 2: The AutoHotkey Orchestrator</h1>
+  <p class="ssub">Claude wrote copy.ahk &mdash; the glue between YouTube, the extension, and Gemini.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="sn sna">1</div>
+      <div><b>Find the right windows</b><small>Locates the Brave window for YouTube and the Chrome window titled "Gemini." Uses process name + window class + title filters to avoid false matches.</small></div>
+    </div>
+    <div class="step">
+      <div class="sn sna">2</div>
+      <div><b>Trigger the extension</b><small>Activates Brave, syncs hover state so the page registers the current thumbnail, then sends the trigger key to the extension.</small></div>
+    </div>
+    <div class="step">
+      <div class="sn sna">3</div>
+      <div><b>Wait for the URL reliably</b><small>Instead of guessing with a timer, it watches the Windows clipboard sequence number &mdash; only reading the clipboard once the OS confirms a change happened.</small></div>
+    </div>
+    <div class="step">
+      <div class="sn sna">4</div>
+      <div><b>Deliver to Gemini</b><small>Activates the Gemini PWA window, clicks the composer, pastes the prompt + URL, hits Enter. Clipboard is then restored to the plain URL.</small></div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Ask Claude to explain design choices</div>
+    "Why watch the clipboard sequence number instead of using a timer?" confirms Claude thought through the timing problem &mdash; and teaches you something useful for future projects.
+  </div>
+</div>
+
+
+<!-- SLIDE 6: Gemini wiring -->
+<div class="slide" data-phase="2">
+  <span class="stag t2">&#9670; Phase 2 &mdash; Build</span>
+  <h1 class="stitle">Build 3: Wiring Up Gemini</h1>
+  <p class="ssub">Clicking inside a Chrome PWA without moving the mouse required a specific approach.</p>
+  <div class="cols c2">
+    <div class="box bi">
+      <div class="blabel">The challenge</div>
+      Standard AHK click commands move the physical cursor. The goal was to land a click in Gemini's composer input while the user's mouse stays wherever it was &mdash; no visible disruption.
+    </div>
+    <div class="box bf">
+      <div class="blabel">Claude's approach</div>
+      Send raw Windows mouse messages directly to Chromium's render widget via PostMessage. The click lands in Gemini's UI; the OS cursor never moves.
+    </div>
+  </div>
+  <div class="box bw" style="margin-top:6px">
+    <div class="blabel">&#9889; Configurable by design</div>
+    Claude added two named constants at the top of the script for the composer click position (as fractions of the window size). If the click lands slightly off, you change two numbers &mdash; no need to read the rest of the script.
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Ask Claude to make tunable values obvious</div>
+    "Put anything someone might need to adjust as named constants at the top" is a prompt worth repeating for any project. It makes the result usable by non-developers.
+  </div>
+</div>
+
+
+<!-- SLIDE 7: Hotkey iteration -->
+<div class="slide" data-phase="3">
+  <span class="stag t3">&#9670; Phase 3 &mdash; Iterate</span>
+  <h1 class="stitle">Iteration 1: From Three Hotkeys to One</h1>
+  <p class="ssub">The first version had three separate shortcuts. Through review and conversation, it became one.</p>
+  <div class="cols c2">
+    <div>
+      <div class="box bw">
+        <div class="blabel">&#9888; First version &mdash; three hotkeys</div>
+        <code>Alt+X</code> &mdash; copy URL only (extension trigger, global)<br>
+        <code>Alt+C</code> &mdash; full flow to Gemini<br>
+        <code>Alt+Z</code> &mdash; paste only (legacy from an older script)
+      </div>
+      <div class="tip" style="margin-top:8px">
+        <div class="tlabel">&#128161; The problem</div>
+        Three shortcuts with overlapping jobs added cognitive load. The paste-only Alt+Z was a leftover from an earlier version (paste.ahk) that no longer existed as a separate file.
+      </div>
+    </div>
+    <div>
+      <div class="box bf">
+        <div class="blabel">&#10003; After iteration &mdash; one hotkey</div>
+        <code>Alt+Z</code> &mdash; the full flow: copy from YouTube &rarr; wait for clipboard &rarr; activate Gemini &rarr; click composer &rarr; paste prompt + URL &rarr; send. That's it.
+      </div>
+      <div class="box bi" style="margin-top:8px">
+        <div class="blabel">What was said to Claude</div>
+        "Remove Alt+X as a global shortcut. Remove the paste-only Alt+Z. Rename Alt+C to Alt+Z for the full flow. Update the README and manifest description to match."
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SLIDE 8: Mouse iteration -->
+<div class="slide" data-phase="3">
+  <span class="stag t3">&#9670; Phase 3 &mdash; Iterate</span>
+  <h1 class="stitle">Iteration 2: Stop Restoring the Cursor, Stop Moving It</h1>
+  <p class="ssub">The first attempt at "no visible cursor jump" was solving the wrong problem.</p>
+  <div class="tl">
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--ylw);color:#000">1</div>
+      <div class="tl-body">
+        <div class="tl-title">First attempt: save and restore the cursor position</div>
+        <div class="tl-sub">AHK saved the mouse position before the Gemini click, then jumped back in a cleanup block. Technically worked &mdash; but the cursor visibly snapped back to where it started. Still jarring.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--ylw);color:#000">2</div>
+      <div class="tl-body">
+        <div class="tl-title">Realisation: wrong problem being solved</div>
+        <div class="tl-sub">The real goal was "don't move the mouse at all" &mdash; not "move it and jump it back." Described this to Claude: "The cursor snapping back looks bad. I don't want it to move in the first place."</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--grn);color:#000">&#10003;</div>
+      <div class="tl-body">
+        <div class="tl-title">Final: PostMessage &mdash; cursor never moves</div>
+        <div class="tl-sub">Raw Windows messages sent directly to Chromium's render widget. No physical mouse movement at any point. The save/restore logic and all the mouse-position code was removed entirely.</div>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Describe the outcome, not the fix</div>
+    "The cursor snaps back which looks bad" led Claude to the right solution. "Make the restore faster" would have produced a worse version of the wrong approach.
+  </div>
+</div>
+
+
+<!-- SLIDE 9: README iteration -->
+<div class="slide" data-phase="3">
+  <span class="stag t3">&#9670; Phase 3 &mdash; Iterate</span>
+  <h1 class="stitle">Iteration 3: The README Rewrote Three Times</h1>
+  <p class="ssub">Docs drift out of date with every code change. Asking Claude to update them after each iteration kept everything in sync.</p>
+  <div class="tl">
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--acc);color:#fff">1</div>
+      <div class="tl-body">
+        <div class="tl-title">After initial build</div>
+        <div class="tl-sub">Covered all three hotkeys, setup steps for each component, Brave vs Chrome notes, tuning the click fractions. Comprehensive but complex.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--acc);color:#fff">2</div>
+      <div class="tl-body">
+        <div class="tl-title">After hotkey consolidation</div>
+        <div class="tl-sub">Dropped Alt+X and legacy Alt+Z from the table. Updated every reference to the single Alt+Z flow. Removed paste.ahk mention. Cleaned the files table.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--grn);color:#000">&#10003;</div>
+      <div class="tl-body">
+        <div class="tl-title">Final version &mdash; workflow-first, concise</div>
+        <div class="tl-sub">Starts with the workflow (thumbnail &rarr; Alt+Z &rarr; Gemini). Short hotkey table. Ordered setup steps. Brave vs Chrome note. One paragraph on tuning. No legacy content.</div>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Let Claude maintain docs too</div>
+    After any significant change: "Update the README to reflect what just changed." It's faster and more accurate than editing manually &mdash; Claude knows exactly what changed.
+  </div>
+</div>
+
+
+<!-- SLIDE 10: Bug 1 -->
+<div class="slide" data-phase="4">
+  <span class="stag t4">&#9670; Phase 4 &mdash; Debug</span>
+  <h1 class="stitle">Bug 1: Gemini Sometimes Got the Wrong URL</h1>
+  <p class="ssub">Intermittent bugs are the hardest kind. This one happened about 1 in 5 times.</p>
+  <div class="cols c2">
+    <div>
+      <div class="box bb">
+        <div class="blabel">&#128997; The symptom</div>
+        After Alt+Z, Gemini occasionally received a URL from a <em>previous</em> press &mdash; not the current thumbnail. The "Copied!" toast showed in YouTube every time, so the extension appeared to be working fine.
+      </div>
+      <div class="box bw" style="margin-top:8px">
+        <div class="blabel">The bug report given to Claude</div>
+        "When I hover thumbnail A and press Alt+Z, Gemini sometimes gets a URL from a previous session. Happens maybe 1 in 5 times. The toast shows 'Copied!' every time so the extension side seems fine."
+      </div>
+    </div>
+    <div>
+      <div class="box bf">
+        <div class="blabel">&#10003; Root cause and fix</div>
+        The browser clipboard API is asynchronous &mdash; the write hadn't finished before AHK read the clipboard. Fix: switch to a synchronous copy method as the primary path. AHK also moved from a guessed timer to watching the Windows clipboard sequence number &mdash; only proceeding once the OS confirms the write actually happened. Version bumped to 1.0.1.
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Always include frequency in bug reports</div>
+    "Happens 1 in 5 times" immediately tells Claude this is a race condition or timing issue &mdash; not a logic error. That single detail narrowed the diagnosis significantly.
+  </div>
+</div>
+
+
+<!-- SLIDE 11: Bug 2 -->
+<div class="slide" data-phase="4">
+  <span class="stag t4">&#9670; Phase 4 &mdash; Debug</span>
+  <h1 class="stitle">Bug 2: Hover Detection Failed on Some Thumbnails</h1>
+  <p class="ssub">YouTube uses different page structure depending on where you are on the site.</p>
+  <div class="cols c2">
+    <div>
+      <div class="box bb">
+        <div class="blabel">&#128997; The symptom</div>
+        On Shorts thumbnails on the home page and playlist items, Alt+Z did nothing &mdash; no toast appeared. Regular video thumbnails worked perfectly. Completely consistent on the affected types.
+      </div>
+      <div class="box bw" style="margin-top:8px">
+        <div class="blabel">The bug report given to Claude</div>
+        "Hovering a Shorts thumbnail on the home page does nothing. No toast. Regular thumbnails work fine. I inspected the element in DevTools and the tag is <code>ytd-rich-grid-media</code>."
+      </div>
+    </div>
+    <div>
+      <div class="box bf">
+        <div class="blabel">&#10003; Root cause and fix</div>
+        YouTube uses different custom element names across page types. The extension only handled a few. Claude expanded the recognised list to cover all known variants and added a fallback that searches any video container for a link &mdash; making the extension more resilient to future YouTube layout changes too.
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Use DevTools to give Claude the element name</div>
+    "Doesn't work on some thumbnails" gives Claude nothing to work with. "The element tag is <code>ytd-rich-grid-media</code>" gives it exactly what it needs. Right-click &rarr; Inspect is the most useful move you can make when debugging UI issues.
+  </div>
+</div>
+
+
+<!-- SLIDE 12: Bug 3 -->
+<div class="slide" data-phase="4">
+  <span class="stag t4">&#9670; Phase 4 &mdash; Debug</span>
+  <h1 class="stitle">Bug 3: Gemini Composer Click Landed Outside the Input</h1>
+  <p class="ssub">The PostMessage click was position-dependent. Smaller windows shifted where it landed.</p>
+  <div class="cols c2">
+    <div>
+      <div class="box bb">
+        <div class="blabel">&#128997; The symptom</div>
+        After Alt+Z, Gemini came into focus but the prompt wasn't pasted. The window was active &mdash; the click just didn't land in the text input. Happened consistently when the Gemini window was smaller than a certain size.
+      </div>
+      <div class="box bw" style="margin-top:8px">
+        <div class="blabel">The bug report given to Claude</div>
+        "Gemini gets focus but text isn't pasted. The window is active. This happens every time with a smaller window. When maximised, it works fine."
+      </div>
+    </div>
+    <div>
+      <div class="box bf">
+        <div class="blabel">&#10003; Root cause and fix</div>
+        Click coordinates were computed as fractions of window size, but the initial values were calibrated for one specific size. Claude extracted these into two named constants at the top of the file and added a hover event before the click to prime Chromium's input handling.
+      </div>
+      <div class="box bi" style="margin-top:8px">
+        <div class="blabel">Result for anyone using this</div>
+        If the click ever lands off-target on a different screen or layout, change two numbers at the top of the file. No understanding of the underlying implementation needed.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SLIDE 13: Demo GIF -->
+<div class="slide" data-phase="5">
+  <span class="stag t5">&#9670; Phase 5 &mdash; Polish</span>
+  <h1 class="stitle">Polish 1: The Demo GIF Took Three Tries</h1>
+  <p class="ssub">Claude wrote a Python script to generate the GIF. The colours took iteration to get right for GitHub.</p>
+  <div class="tl">
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--acc);color:#fff">1</div>
+      <div class="tl-body">
+        <div class="tl-title">Version 1 &mdash; clean diagram style</div>
+        <div class="tl-sub">Python script using Pillow + imageio. Five scenes: title, hover, hotkey, Gemini prompt, summary. Simple colours. Looked fine locally.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--ylw);color:#000">2</div>
+      <div class="tl-body">
+        <div class="tl-title">Versions 2&ndash;3 &mdash; saturated colours looked great locally, not on GitHub</div>
+        <div class="tl-sub">More colours, gradients, rainbow stripes. GitHub re-encodes GIFs with a small palette &mdash; the gradients turned into dithering noise and blotchy stripes in the README preview.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--grn);color:#000">&#10003;</div>
+      <div class="tl-body">
+        <div class="tl-title">Final &mdash; white background, red text, 32-colour palette</div>
+        <div class="tl-sub">No gradients. Instruction-only slides. Reduced palette means GitHub's re-encoding has nothing to distort. Renders cleanly in the README. Script left in the repo so the GIF can be regenerated anytime.</div>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; Platform constraints apply to assets too</div>
+    "Looks bad on GitHub" is a valid bug report for a GIF. Once the GitHub palette constraint was stated, Claude knew exactly how to redesign it.
+  </div>
+</div>
+
+
+<!-- SLIDE 14: Git -->
+<div class="slide" data-phase="5">
+  <span class="stag t5">&#9670; Phase 5 &mdash; Polish</span>
+  <h1 class="stitle">Polish 2: Git Hygiene Throughout</h1>
+  <p class="ssub">Claude handled every commit and push &mdash; not just the code. The git history tells the story of the build.</p>
+  <div class="cols c2">
+    <div class="steps">
+      <div class="step">
+        <div class="sn sng">&#10003;</div>
+        <div><b>Scoped, meaningful commit messages</b><small>Each commit was named for what changed and why &mdash; not just "update files". Future readers can follow the build story from commits alone.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn sng">&#10003;</div>
+        <div><b>Version bump on significant fixes</b><small>When the async clipboard fix shipped, Claude bumped the extension to 1.0.1 and added a note to reload the extension in the README.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn sng">&#10003;</div>
+        <div><b>Cleanup included in same commit</b><small>When paste.ahk was deleted and legacy shortcuts removed, README and manifest were updated in the same commit. No orphaned references.</small></div>
+      </div>
+    </div>
+    <div>
+      <div class="box bi">
+        <div class="blabel">How to ask Claude to commit</div>
+        "Commit and push everything. Write a message that summarises what changed and why." Claude stages the right files, writes a scoped message, and pushes &mdash; including handling upstream setup on first push.
+      </div>
+      <div class="box bf" style="margin-top:8px">
+        <div class="blabel">What this gives you</div>
+        A clean history that actually documents the project &mdash; not a pile of "wip" or "fix" commits. Anyone can read the git log and understand how the project evolved.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SLIDE 15: Full timeline -->
+<div class="slide" data-phase="6">
+  <span class="stag t6">&#9670; The Full Arc</span>
+  <h1 class="stitle">From Idea to Shipped: What Actually Happened</h1>
+  <p class="ssub">Every step driven by conversation &mdash; no human-written code, just clear descriptions and honest testing.</p>
+  <div class="tl">
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--cyan);color:#000">1</div>
+      <div class="tl-body"><div class="tl-title">Define problem + review architecture</div><div class="tl-sub">Goal stated as an outcome with platform and constraints. Architecture proposed and reviewed. Async timing flagged as the hardest problem &mdash; before any code.</div></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--acc);color:#fff">2</div>
+      <div class="tl-body"><div class="tl-title">Build content.js, copy.ahk, manifest</div><div class="tl-sub">One file at a time. Extension loaded and tested in Brave before the AHK script was written. Each piece verified standalone.</div></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--acc);color:#fff">3</div>
+      <div class="tl-body"><div class="tl-title">Add Gemini integration</div><div class="tl-sub">FindGeminiWindow, PostMessage composer click, paste prefix, clipboard restore &mdash; all specified through conversation. Three hotkeys initially.</div></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--ylw);color:#000">4</div>
+      <div class="tl-body"><div class="tl-title">Iterate: hotkeys &rarr; one, mouse &rarr; PostMessage</div><div class="tl-sub">Three hotkeys became one (Alt+Z). Cursor-snap workaround replaced with no-cursor-movement-at-all. README updated after each change.</div></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--red);color:#fff">5</div>
+      <div class="tl-body"><div class="tl-title">Debug: stale URL, hover detection, click position</div><div class="tl-sub">Each bug reported with symptom + frequency + specifics. Each fix applied, re-tested, and confirmed. Version bumped after the clipboard fix.</div></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--grn);color:#000">&#10003;</div>
+      <div class="tl-body"><div class="tl-title">Polish and ship</div><div class="tl-sub">Demo GIF iterated to GitHub-safe format (3 tries). README finalised. Clean commits throughout. Pushed to origin/master.</div></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SLIDE 16: Takeaways -->
+<div class="slide" data-phase="6">
+  <span class="stag t6">&#9670; Takeaways</span>
+  <h1 class="stitle">Eight Rules This Project Demonstrates</h1>
+  <p class="ssub">Apply these to any project you build on autopilot with Claude.</p>
+  <div class="cols c2">
+    <div class="steps">
+      <div class="step">
+        <div class="sn snc">1</div>
+        <div><b>Goal first, not solution first</b><small>Describe what you want to happen. Let Claude decide how to build it.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn snc">2</div>
+        <div><b>State all constraints upfront</b><small>"Mouse must not move" shaped the whole architecture. Hidden constraints cause rework.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn snc">3</div>
+        <div><b>Architecture before code, always</b><small>Claude flags the hard problems at design time &mdash; before they cost time to fix.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn snc">4</div>
+        <div><b>One component at a time</b><small>Build, test, confirm &mdash; then ask for the next piece. Test each component before the next is written.</small></div>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="sn sng">5</div>
+        <div><b>Test to break, not to confirm</b><small>Try edge cases. Different window sizes. Different thumbnail types. No hover before pressing the key.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn sng">6</div>
+        <div><b>Precise bug reports</b><small>"1 in 5 times" and "element tag is ytd-rich-grid-media" were the two details that made bugs fixable fast.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn sng">7</div>
+        <div><b>Describe outcomes, not fixes</b><small>"The cursor snapping back looks bad" &rarr; PostMessage. "Make restore faster" &rarr; wrong direction entirely.</small></div>
+      </div>
+      <div class="step">
+        <div class="sn sng">8</div>
+        <div><b>Claude maintains docs and commits too</b><small>README, version bumps, commit messages &mdash; that's all part of the work. Ask for it every time.</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    </div>
+
+    <div id="nav">
+      <button class="nbtn" id="prev" onclick="navigate(-1)" disabled>&#8592; Prev</button>
+      <div>
+        <div id="slabel"></div>
+        <div id="sctr"></div>
+      </div>
+      <button class="nbtn" id="next" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const total = slides.length;
+  let cur = 0, busy = false;
+  const phaseMap = [0,2,4,7,10,13,15];
+  const labels = [
+    "Title","Full Autopilot Concept",
+    "Define the Problem","Architecture Proposal",
+    "Build: The Extension","Build: The AHK Script","Build: Gemini Wiring",
+    "Iterate: Hotkey Simplification","Iterate: Mouse to PostMessage","Iterate: README Evolution",
+    "Bug: Stale URL","Bug: Hover Detection","Bug: Click Position",
+    "Polish: Demo GIF","Polish: Git & Commits",
+    "Full Timeline","Takeaways"
+  ];
+  function phase(i){ let p=0; for(let j=0;j<phaseMap.length;j++) if(i>=phaseMap[j]) p=j; return p; }
+  function updateSidebar(i){
+    document.querySelectorAll(".pbtn").forEach(function(b,j){
+      b.classList.remove("active","done");
+      if(j===phase(i)) b.classList.add("active");
+      else if(j<phase(i)) b.classList.add("done");
+    });
+  }
+  function show(idx,dir){
+    if(busy||idx<0||idx>=total) return;
+    busy=true;
+    var prev=slides[cur], next=slides[idx];
+    prev.classList.add("exit"); prev.classList.remove("active");
+    next.style.transform=dir>0?"translateX(32px)":"translateX(-32px)";
+    next.style.opacity="0"; next.classList.add("active");
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ next.style.transform=""; next.style.opacity=""; }); });
+    setTimeout(function(){ prev.classList.remove("exit"); prev.style.transform=""; busy=false; },280);
+    cur=idx; updateUI();
+  }
+  function updateUI(){
+    var pct=total<=1?100:(cur/(total-1))*100;
+    document.getElementById("pfill").style.width=pct+"%";
+    document.getElementById("sctr").textContent=(cur+1)+" / "+total;
+    document.getElementById("slabel").textContent=labels[cur]||"";
+    document.getElementById("prev").disabled=cur===0;
+    document.getElementById("next").disabled=cur===total-1;
+    updateSidebar(cur);
+  }
+  window.navigate=function(d){ show(cur+d,d); };
+  window.jumpToPhase=function(p){ var t=phaseMap[p]||0; show(t,t>cur?1:-1); };
+  document.addEventListener("keydown",function(e){
+    if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){ e.preventDefault(); navigate(1); }
+    else if(e.key==="ArrowLeft"||e.key==="PageUp"){ e.preventDefault(); navigate(-1); }
+    else if(e.key==="Home"){ e.preventDefault(); show(0,-1); }
+    else if(e.key==="End"){ e.preventDefault(); show(total-1,1); }
+  });
+  slides.forEach(function(s,i){ if(i!==0){s.style.transform="translateX(32px)";s.style.opacity="0";} });
+  slides[0].classList.add("active");
+  updateUI();
+})();
+</script>
+</body>
+</html>

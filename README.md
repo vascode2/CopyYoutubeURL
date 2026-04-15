@@ -2,6 +2,8 @@
 
 ![Workflow demo — red text on white (not a screen recording)](docs/workflow-demo.gif)
 
+**How it was built:** [docs/project-build-presentation.html](docs/project-build-presentation.html) — narrative from the Cursor chat that shaped the extension, AutoHotkey, and Gemini workflow.
+
 ## Workflow
 
 1. Open **YouTube** in **Google Chrome** (or **Brave**) with this extension enabled.
