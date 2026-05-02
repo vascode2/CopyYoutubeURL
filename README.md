@@ -1,10 +1,10 @@
 # CopyURL — YouTube thumbnail → Gemini (Windows)
 
-![Workflow demo — red text on white (not a screen recording)](docs/workflow-demo.gif)
-
-**📖 [Visual explainer (opens in browser)](https://htmlpreview.github.io/?https://github.com/vascode2/CopyYoutubeURL/blob/master/docs/CopyYoutubeURL-explainer.html)** — plain-English walkthrough with flowchart, sticky-note before/after, and a sample of what lands in Gemini. *(Source: [docs/CopyYoutubeURL-explainer.html](docs/CopyYoutubeURL-explainer.html))*
+> 📖 **[See this for a visually explained README](https://vascode2.github.io/CopyYoutubeURL/docs/CopyYoutubeURL-explainer.html)**
 
 **How it was built:** [docs/project-build-presentation.html](docs/project-build-presentation.html) — narrative from the Cursor chat that shaped the extension, AutoHotkey, and Gemini workflow.
+
+**macOS (Mac mini)?** A Hammerspoon port lives in [Mac/](Mac/) — see [Mac/README.md](Mac/README.md).
 
 ## Workflow
 
