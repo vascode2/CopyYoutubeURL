@@ -73,6 +73,43 @@ WM_LBUTTONDOWN := 0x201
 WM_LBUTTONUP := 0x202
 MK_LBUTTON := 0x1
 
+; Browsers we'll search for the YouTube tab, in priority order. Brave first so
+; existing setups keep behaving identically; Chrome added so the same script
+; works when the extension is installed in Chrome instead.
+kYouTubeBrowsers := ["brave.exe", "chrome.exe"]
+
+/**
+ * Find the active top-level browser window most likely to be hosting the
+ * YouTube tab. Scans kYouTubeBrowsers in order. Within each browser, prefers
+ * a window whose title contains "YouTube" (i.e. its active tab is YouTube),
+ * otherwise falls back to the first visible top-level window so the existing
+ * "activate, then check title" flow can still report a useful error.
+ *
+ * For Chrome we also exclude the Gemini PWA window (its title contains
+ * "Gemini") so we never confuse the source tab with the destination app.
+ */
+FindYouTubeWindow() {
+    global kYouTubeBrowsers
+    fallback := 0
+    for _i, exe in kYouTubeBrowsers {
+        allWins := WinGetList("ahk_exe " . exe)
+        for _j, hwnd in allWins {
+            title := WinGetTitle(hwnd)
+            cls := WinGetClass(hwnd)
+            visible := DllCall("IsWindowVisible", "Ptr", hwnd)
+            if !(visible && cls = "Chrome_WidgetWin_1" && title != "")
+                continue
+            if (exe = "chrome.exe" && InStr(title, "Gemini"))
+                continue
+            if InStr(title, "YouTube")
+                return hwnd
+            if !fallback
+                fallback := hwnd
+        }
+    }
+    return fallback
+}
+
 FindBraveWindow() {
     allWins := WinGetList("ahk_exe brave.exe")
     for index, hwnd in allWins {
@@ -300,22 +337,21 @@ $!z:: {
     KeyWait("LAlt", "T0.4")
     KeyWait("RAlt", "T0.4")
 
-    hwnd := FindBraveWindow()
+    hwnd := FindYouTubeWindow()
     if !hwnd {
-        DebugLog("No Brave window found.")
-        TrayTip("Brave window not found.", "CopyURL")
+        DebugLog("No YouTube-capable browser window found (Brave/Chrome).")
+        TrayTip("YouTube window not found in Brave or Chrome.", "CopyURL")
         return
     }
     WinActivate(hwnd)
     if !WinWaitActive(hwnd,, 2) {
-        VerboseLog("pre_attempt " . attempt . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
-        DebugLog("Copy attempt " . attempt)
-        if TryCopyOnce(kCopyAttemptTimeoutMs, hwnd "CopyURL")
+        DebugLog("WinWaitActive timed out for hwnd=" . hwnd . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
+        TrayTip("Could not activate the browser window.", "CopyURL")
         return
     }
     if !ActiveTabIsYouTube(hwnd) {
-        DebugLog("Active Brave tab is not YouTube. Title=" . WinGetTitle(hwnd))
-        TrayTip("Active Brave tab is not YouTube. Switch to the YouTube tab and retry.", "CopyURL")
+        DebugLog("Active browser tab is not YouTube. Title=" . WinGetTitle(hwnd))
+        TrayTip("Active tab is not YouTube. Switch to the YouTube tab and retry.", "CopyURL")
         return
     }
     SendInput("{Escape}")
@@ -330,7 +366,7 @@ $!z:: {
         SyncChromiumHoverThorough(hwnd)
         Sleep(120)
         DebugLog("Copy attempt " . attempt)
-        if TryCopyOnce(kCopyAttemptTimeoutMs) {
+        if TryCopyOnce(kCopyAttemptTimeoutMs, hwnd) {
             success := true
             DebugLog("Copy attempt " . attempt . " succeeded.")
             break
