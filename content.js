@@ -6,6 +6,61 @@
   let lastClientX = -1;
   let lastClientY = -1;
 
+  // ---- Diagnostics: ring buffer + title beacon ----------------------------
+  // Ring buffer is gated behind localStorage.__copyurlDebug = "1" (cheap when off).
+  // Title beacon is ALWAYS on: a transient zero-width-space + "[CU:STATE]" suffix
+  // appended to document.title for ~300 ms so AutoHotkey can read it via WinGetTitle.
+  // STATE values: ok | null | execfail | asyncpending | asyncok | asyncfail | notready
+  const BEACON_PREFIX = "\u200B[CU:";
+  const BEACON_SUFFIX = "]";
+  const BEACON_TTL_MS = 300;
+  let _beaconTimer = null;
+  let _beaconBaseTitle = null;
+  const _ringEnabled = (() => {
+    try { return localStorage.getItem("__copyurlDebug") === "1"; } catch { return false; }
+  })();
+  const _ring = [];
+  function diag(event, data) {
+    if (!_ringEnabled) return;
+    const entry = { t: Date.now(), event, ...(data || {}) };
+    _ring.push(entry);
+    if (_ring.length > 200) _ring.shift();
+    try { console.debug("[CopyURL]", event, data || ""); } catch {}
+  }
+  function setBeacon(state) {
+    try {
+      // Strip any prior beacon first.
+      const cur = document.title || "";
+      const base = stripBeacon(cur);
+      if (_beaconBaseTitle === null) _beaconBaseTitle = base;
+      document.title = base + " " + BEACON_PREFIX + state + BEACON_SUFFIX;
+      if (_beaconTimer) clearTimeout(_beaconTimer);
+      _beaconTimer = setTimeout(() => {
+        const now = stripBeacon(document.title || "");
+        // Only restore if YouTube hasn't changed the title in the meantime.
+        if (now === base) document.title = base;
+        _beaconTimer = null;
+        _beaconBaseTitle = null;
+      }, BEACON_TTL_MS);
+    } catch {}
+  }
+  function stripBeacon(title) {
+    const i = title.indexOf(BEACON_PREFIX);
+    if (i === -1) return title;
+    // Trim trailing space we added before the beacon.
+    return title.slice(0, i).replace(/\s+$/, "");
+  }
+  // Expose for live inspection.
+  try {
+    Object.defineProperty(window, "__copyurlLog", {
+      get() { return _ring.slice(); },
+      configurable: true,
+    });
+    window.__copyurlReady = true;
+    window.dispatchEvent(new CustomEvent("copyurl-ready"));
+  } catch {}
+  diag("loaded", { url: location.href, ringEnabled: _ringEnabled });
+
   function refreshHoverFromLastPointer() {
     if (lastClientX < 0 || lastClientY < 0) return;
     const el = document.elementFromPoint(lastClientX, lastClientY);
@@ -151,13 +206,28 @@
     true
   );
 
-  // Alt+X: used by copy.ahk (SendEvent) after it focuses YouTube — not a separate global shortcut.
-
+  // F24 trigger: sent by copy.ahk (SendInput "{F24}") on Windows. F24 is used because
+  // it has no default browser/OS binding and won't collide with other tools' global
+  // hotkeys (e.g. CopyAnkitoChatGPT owns Alt+X system-wide). On macOS this listener
+  // is unused (Hammerspoon drives the page differently).
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.altKey && (e.key === "x" || e.key === "X") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        if (!hoveredVideoUrl) return;
+      if ((e.key === "F24" || e.code === "F24") && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        const ctx = {
+          hovered: hoveredVideoUrl,
+          x: lastClientX,
+          y: lastClientY,
+          focused: document.hasFocus(),
+          visible: document.visibilityState,
+        };
+        diag("trigger_keydown", ctx);
+
+        if (!hoveredVideoUrl) {
+          setBeacon("null");
+          diag("trigger_no_hover", ctx);
+          return;
+        }
 
         e.preventDefault();
         e.stopPropagation();
@@ -165,13 +235,24 @@
         // Synchronous copy first: navigator.clipboard.writeText is async and AutoHotkey often
         // reads the clipboard before the promise resolves, pasting a stale URL into Gemini.
         if (copyViaExecCommand(hoveredVideoUrl)) {
+          setBeacon("ok");
+          diag("exec_ok", { url: hoveredVideoUrl });
           showToast(hoveredElement, "Copied!");
           return;
         }
+        setBeacon("execfail");
+        diag("exec_fail", { url: hoveredVideoUrl });
+        const urlAtFire = hoveredVideoUrl;
         void navigator.clipboard
-          .writeText(hoveredVideoUrl)
-          .then(() => showToast(hoveredElement, "Copied!"))
-          .catch(() => {
+          .writeText(urlAtFire)
+          .then(() => {
+            setBeacon("asyncok");
+            diag("async_ok", { url: urlAtFire });
+            showToast(hoveredElement, "Copied!");
+          })
+          .catch((err) => {
+            setBeacon("asyncfail");
+            diag("async_fail", { err: String(err) });
             showToast(hoveredElement, "Copy failed");
           });
       }

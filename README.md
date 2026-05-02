@@ -2,18 +2,20 @@
 
 ![Workflow demo — red text on white (not a screen recording)](docs/workflow-demo.gif)
 
+**📖 [Visual explainer (opens in browser)](https://htmlpreview.github.io/?https://github.com/vascode2/CopyYoutubeURL/blob/master/docs/CopyYoutubeURL-explainer.html)** — plain-English walkthrough with flowchart, sticky-note before/after, and a sample of what lands in Gemini. *(Source: [docs/CopyYoutubeURL-explainer.html](docs/CopyYoutubeURL-explainer.html))*
+
 **How it was built:** [docs/project-build-presentation.html](docs/project-build-presentation.html) — narrative from the Cursor chat that shaped the extension, AutoHotkey, and Gemini workflow.
 
 ## Workflow
 
 1. Open **YouTube** in **Google Chrome** (or **Brave**) with this extension enabled.
 2. Point at the **thumbnail** of the video you care about — the extension remembers which video that is.
-3. Press **Alt+Z** (with **AutoHotkey v2** and **`copy.ahk`** on Windows). The script briefly brings the YouTube window forward, copies that video’s **YouTube URL**, switches to the **Gemini** app, pastes a short “summarize” line plus the link, and sends it. Afterward the **clipboard is set back to the plain URL**. Your **physical mouse is not moved** (posted window messages to Chromium).
+3. Press **Alt+Z** (with **AutoHotkey v2** and **`copy.ahk`** on Windows). The script briefly brings the YouTube window forward, copies that video's **YouTube URL**, switches to the **Gemini** app, clicks the composer input, pastes a short "summarize" line plus the link, and sends it. Afterward the **clipboard is set back to the plain URL**. The cursor briefly moves to click the Gemini input field, then returns to its original position.
 4. **Gemini** replies with a **summary** (and you can follow up in the same chat).
 
 **Why this works:** **Gemini** can use a **YouTube URL** as real video context for summaries and Q&A. Many other assistants only treat links as plain text.
 
-**Implementation note:** `copy.ahk` sends **Alt+X** *inside* the YouTube tab so the extension can copy the URL; you do not use **Alt+X** as a separate global shortcut anymore. The extension copies **synchronously** (`execCommand`) so the OS clipboard is ready before AutoHotkey continues; the script also waits for a **Windows clipboard update** before reading the URL, so Gemini should not receive a stale link.
+**Implementation note:** `copy.ahk` sends **F24** *inside* the YouTube tab so the extension can copy the URL. F24 is used as the internal AutoHotkey↔extension signal because it has no default browser binding and can't collide with other tools' global hotkeys (e.g. CopyAnkitoChatGPT owns Alt+X system-wide). **Alt+Z is the only user-facing hotkey.** The extension copies **synchronously** (`execCommand`) so the OS clipboard is ready before AutoHotkey continues; the script also waits for a **Windows clipboard update** before reading the URL, so Gemini should not receive a stale link.
 
 | Hotkey | Action |
 |--------|--------|
