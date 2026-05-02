@@ -107,9 +107,11 @@ const s = {
 
   chat: { background: '#FFFFFF', border: '1px solid #21262D', borderRadius: '8px', overflow: 'visible', color: '#1A1A1A', position: 'relative' },
   chatStickie: { position: 'absolute', top: '-18px', right: '32px', transform: 'rotate(5deg)', background: '#FFE066', color: '#1A1A1A', padding: '10px 18px 14px', fontFamily: '"Caveat", cursive', fontSize: '20px', boxShadow: '3px 4px 0 rgba(0,0,0,0.35)', zIndex: 2, border: '1px solid rgba(0,0,0,0.15)' },
-  chatBar: { background: '#F1F1EF', borderBottom: '1px solid #E5E5E2', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' },
-  chatDot: { width: '11px', height: '11px', borderRadius: '50%', background: '#F85149' },
-  chatUrl: { marginLeft: '14px', color: '#666', fontFamily: 'monospace' },
+  chatBar: { background: '#F1F1EF', borderBottom: '1px solid #E5E5E2', padding: '0 0 0 16px', display: 'flex', alignItems: 'center', fontSize: '12px', height: '32px' },
+  chatUrl: { color: '#444', fontFamily: 'Segoe UI, system-ui, sans-serif', flex: 1 },
+  winBtns: { display: 'flex', height: '100%' },
+  winBtn: { width: '46px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Segoe MDL2 Assets, Segoe UI Symbol, sans-serif', fontSize: '10px', color: '#1A1A1A' },
+  winBtnClose: { width: '46px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Segoe MDL2 Assets, Segoe UI Symbol, sans-serif', fontSize: '10px', color: '#fff', background: '#E81123' },
   chatInner: { padding: '32px 40px' },
   chatTitle: { fontSize: '24px', fontWeight: 700, margin: '0 0 6px', color: '#1A1A1A' },
   chatMeta: { fontSize: '13px', color: '#888', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid #EEE' },
@@ -362,10 +364,12 @@ function Explainer() {
               <span>your morning skim ☕</span>
             </div>
             <div style={s.chatBar}>
-              <span style={s.chatDot} />
-              <span style={{...s.chatDot, background: '#FFA657'}} />
-              <span style={{...s.chatDot, background: '#3FB950'}} />
-              <span style={s.chatUrl}>gemini.google.com/app</span>
+              <span style={s.chatUrl}>Gemini  —  gemini.google.com/app</span>
+              <div style={s.winBtns}>
+                <span style={s.winBtn}>–</span>
+                <span style={s.winBtn}>□</span>
+                <span style={s.winBtnClose}>✕</span>
+              </div>
             </div>
             <div style={s.chatInner}>
               <h3 style={s.chatTitle}>New chat</h3>
