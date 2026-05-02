@@ -107,7 +107,7 @@
     <button class="pbtn" data-phase="2" onclick="jumpToPhase(2)"><span class="dot"></span>Build<span class="cnt">3</span></button>
     <button class="pbtn" data-phase="3" onclick="jumpToPhase(3)"><span class="dot"></span>Iterate<span class="cnt">3</span></button>
     <button class="pbtn" data-phase="4" onclick="jumpToPhase(4)"><span class="dot"></span>Debug<span class="cnt">3</span></button>
-    <button class="pbtn" data-phase="5" onclick="jumpToPhase(5)"><span class="dot"></span>Polish<span class="cnt">2</span></button>
+    <button class="pbtn" data-phase="5" onclick="jumpToPhase(5)"><span class="dot"></span>Polish<span class="cnt">3</span></button>
     <button class="pbtn" data-phase="6" onclick="jumpToPhase(6)"><span class="dot"></span>Ship<span class="cnt">2</span></button>
     <div class="sb-sec" style="margin-top:8px">Navigate</div>
     <div style="padding:0 8px;font-size:11px;color:var(--muted);line-height:2">
@@ -132,10 +132,10 @@
     <div class="htitle">CopyYoutubeURL<br><span class="hgrad">Built on Autopilot</span></div>
     <p class="hsub">A real walkthrough of how this project went from idea to shipped &mdash; using Claude in Cursor as the co-pilot for every decision, every fix, and every iteration.</p>
     <div class="stats" style="margin-top:22px">
-      <div class="stat"><div class="snum2">3</div><div class="slbl">Source files</div></div>
-      <div class="stat"><div class="snum2">7+</div><div class="slbl">Iterations</div></div>
-      <div class="stat"><div class="snum2">3</div><div class="slbl">Bugs squashed</div></div>
-      <div class="stat"><div class="snum2">1</div><div class="slbl">Final hotkey</div></div>
+      <div class="stat"><div class="snum2">2</div><div class="slbl">OS ports</div></div>
+      <div class="stat"><div class="snum2">10+</div><div class="slbl">Iterations</div></div>
+      <div class="stat"><div class="snum2">4</div><div class="slbl">Bugs squashed</div></div>
+      <div class="stat"><div class="snum2">1</div><div class="slbl">User hotkey</div></div>
     </div>
   </div>
   <div style="font-size:11px;color:var(--muted)">Press <span class="kb">&#8594;</span> to start</div>
@@ -352,12 +352,12 @@ Propose the architecture first, before writing any code.</div>
     </div>
     <div>
       <div class="box bf">
-        <div class="blabel">&#10003; After iteration &mdash; one hotkey</div>
+        <div class="blabel">&#10003; After iteration &mdash; one user hotkey</div>
         <code>Alt+Z</code> &mdash; the full flow: copy from YouTube &rarr; wait for clipboard &rarr; activate Gemini &rarr; click composer &rarr; paste prompt + URL &rarr; send. That's it.
       </div>
-      <div class="box bi" style="margin-top:8px">
-        <div class="blabel">What was said to Claude</div>
-        "Remove Alt+X as a global shortcut. Remove the paste-only Alt+Z. Rename Alt+C to Alt+Z for the full flow. Update the README and manifest description to match."
+      <div class="box bw" style="margin-top:8px">
+        <div class="blabel">&#9888; Internal trigger later swapped to F24</div>
+        AHK still needs to signal the extension <em>inside</em> the tab. Originally that was a synthetic <code>Alt+X</code>, but another global tool (CopyAnkitoChatGPT) owned <code>Alt+X</code> system-wide and was swallowing it. Switched the internal handshake to <code>F24</code> &mdash; no default browser binding, no possible collision. <strong>Alt+Z stays the only key the user ever presses.</strong>
       </div>
     </div>
   </div>
@@ -453,7 +453,15 @@ Propose the architecture first, before writing any code.</div>
     <div>
       <div class="box bf">
         <div class="blabel">&#10003; Root cause and fix</div>
-        The browser clipboard API is asynchronous &mdash; the write hadn't finished before AHK read the clipboard. Fix: switch to a synchronous copy method as the primary path. AHK also moved from a guessed timer to watching the Windows clipboard sequence number &mdash; only proceeding once the OS confirms the write actually happened. Version bumped to 1.0.1.
+        The browser clipboard API is asynchronous &mdash; the write hadn't finished before AHK read the clipboard. Fix: switch to a synchronous <code>execCommand("copy")</code> path. AHK also moved from a guessed timer to watching the Windows clipboard <em>sequence number</em> &mdash; only proceeding once the OS confirms the write happened.
+      </div>
+      <div class="box bb" style="margin-top:8px">
+        <div class="blabel">&#128997; Months later: "sometimes works, sometimes doesn't" returned</div>
+        Same symptom resurfaced intermittently. Built an instrumentation harness (ring-buffer in <code>content.js</code> + <code>document.title</code> beacon read by AHK + per-stage timing logs in <code>copy.ahk</code>, all behind flags). The beacon revealed the extension was never receiving the keydown at all on failed runs.
+      </div>
+      <div class="box bf" style="margin-top:8px">
+        <div class="blabel">&#10003; Real root cause: hotkey collision</div>
+        The internal trigger was synthetic <code>Alt+X</code>. A separate productivity tool (CopyAnkitoChatGPT) had a global <code>Alt+X</code> hook that intercepted the synthetic event before Brave saw it. Swapped the internal handshake to <code>F24</code> &mdash; zero collisions possible. Reliability went from "flaky" to consistent.
       </div>
     </div>
   </div>
@@ -593,6 +601,32 @@ Propose the architecture first, before writing any code.</div>
 </div>
 
 
+<!-- SLIDE 14b: Reach &mdash; Mac port + visual explainer + handoff doc -->
+<div class="slide" data-phase="5">
+  <span class="stag t5">&#9670; Phase 5 &mdash; Polish</span>
+  <h1 class="stitle">Polish 3: Reach &mdash; Mac Port, Visual Explainer, Handoff Doc</h1>
+  <p class="ssub">Once the Windows core was solid, Claude extended the project so it travels well &mdash; to other machines, other readers, and future agent sessions.</p>
+  <div class="cols c3">
+    <div class="box bi">
+      <div class="blabel">&#127757; macOS port</div>
+      A Hammerspoon equivalent of <code>copy.ahk</code> lives in <code>Mac/</code>. Same workflow, same hotkey, same Gemini target &mdash; written from the Windows reference implementation in one pass.
+    </div>
+    <div class="box bi">
+      <div class="blabel">&#128202; Visual explainer + GitHub Pages</div>
+      A single-file React + Mermaid HTML explainer in <code>docs/</code> turns the README into a dashboard. Published via GitHub Pages so anyone can read it from a link &mdash; no clone required.
+    </div>
+    <div class="box bi">
+      <div class="blabel">&#128221; CLAUDE.md handoff</div>
+      A persistent handoff doc captures architecture, ranked root causes, decision log, and a resume checklist &mdash; so a future Claude session can pick the project back up without re-reading the whole repo.
+    </div>
+  </div>
+  <div class="tip">
+    <div class="tlabel">&#128161; The work isn't done when the code works</div>
+    Portability, a readable explainer, and a handoff doc are part of "shipped". Each one is cheap to ask Claude for after the core is stable &mdash; and each one multiplies the project's reach.
+  </div>
+</div>
+
+
 <!-- SLIDE 15: Full timeline -->
 <div class="slide" data-phase="6">
   <span class="stag t6">&#9670; The Full Arc</span>
@@ -617,11 +651,11 @@ Propose the architecture first, before writing any code.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot" style="background:var(--red);color:#fff">5</div>
-      <div class="tl-body"><div class="tl-title">Debug: stale URL, hover detection, click position</div><div class="tl-sub">Each bug reported with symptom + frequency + specifics. Each fix applied, re-tested, and confirmed. Version bumped after the clipboard fix.</div></div>
+      <div class="tl-body"><div class="tl-title">Debug: stale URL, hover detection, click position, hotkey collision</div><div class="tl-sub">Each bug reported with symptom + frequency + specifics. The flaky-copy regression months later was traced via an instrumentation harness to a global <code>Alt+X</code> collision &mdash; fixed by swapping the internal trigger to <code>F24</code>.</div></div>
     </div>
     <div class="tl-item">
       <div class="tl-dot" style="background:var(--grn);color:#000">&#10003;</div>
-      <div class="tl-body"><div class="tl-title">Polish and ship</div><div class="tl-sub">Demo GIF iterated to GitHub-safe format (3 tries). README finalised. Clean commits throughout. Pushed to origin/master.</div></div>
+      <div class="tl-body"><div class="tl-title">Polish, port, ship</div><div class="tl-sub">Demo GIF iterated to GitHub-safe format. macOS Hammerspoon port added. Visual explainer published via GitHub Pages. <code>CLAUDE.md</code> handoff doc written. Clean commits throughout.</div></div>
     </div>
   </div>
 </div>
@@ -691,14 +725,14 @@ Propose the architecture first, before writing any code.</div>
   const slides = Array.from(document.querySelectorAll(".slide"));
   const total = slides.length;
   let cur = 0, busy = false;
-  const phaseMap = [0,2,4,7,10,13,15];
+  const phaseMap = [0,2,4,7,10,13,16];
   const labels = [
     "Title","Full Autopilot Concept",
     "Define the Problem","Architecture Proposal",
     "Build: The Extension","Build: The AHK Script","Build: Gemini Wiring",
     "Iterate: Hotkey Simplification","Iterate: Mouse to PostMessage","Iterate: README Evolution",
-    "Bug: Stale URL","Bug: Hover Detection","Bug: Click Position",
-    "Polish: Demo GIF","Polish: Git & Commits",
+    "Bug: Stale URL & Hotkey Collision","Bug: Hover Detection","Bug: Click Position",
+    "Polish: Demo GIF","Polish: Git & Commits","Polish: Reach",
     "Full Timeline","Takeaways"
   ];
   function phase(i){ let p=0; for(let j=0;j<phaseMap.length;j++) if(i>=phaseMap[j]) p=j; return p; }

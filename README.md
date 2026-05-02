@@ -1,6 +1,6 @@
 # Alt+Z: turn any YouTube thumbnail into a Gemini summary.
 
-*CopyURL · Windows · Brave/Chrome + Gemini*
+![Sample output](docs/sample-output.png)
 
 > 📖 **[See this for a visually explained README](https://vascode2.github.io/CopyYoutubeURL/docs/CopyYoutubeURL-explainer.html)**
 
