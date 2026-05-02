@@ -80,16 +80,36 @@ kYouTubeBrowsers := ["brave.exe", "chrome.exe"]
 
 /**
  * Find the active top-level browser window most likely to be hosting the
- * YouTube tab. Scans kYouTubeBrowsers in order. Within each browser, prefers
- * a window whose title contains "YouTube" (i.e. its active tab is YouTube),
- * otherwise falls back to the first visible top-level window so the existing
- * "activate, then check title" flow can still report a useful error.
+ * YouTube tab. Priority:
+ *   1. Whatever's currently in the foreground, if it's one of our browsers
+ *      AND its title contains "YouTube" (and isn't the Gemini PWA).
+ *   2. Scan kYouTubeBrowsers in order, preferring windows whose active tab
+ *      title contains "YouTube".
+ *   3. Fallback: first visible top-level window of any listed browser, so
+ *      the existing "activate, then check title" flow still surfaces a
+ *      useful error.
  *
- * For Chrome we also exclude the Gemini PWA window (its title contains
- * "Gemini") so we never confuse the source tab with the destination app.
+ * For Chrome we exclude the Gemini PWA window (its title contains "Gemini")
+ * so we never confuse the source tab with the destination app.
  */
 FindYouTubeWindow() {
     global kYouTubeBrowsers
+    ; 1. Foreground-first — respects whichever browser the user just used.
+    fg := WinExist("A")
+    if (fg) {
+        try {
+            fgExe := WinGetProcessName(fg)
+            fgTitle := WinGetTitle(fg)
+            fgCls := WinGetClass(fg)
+            for _i, exe in kYouTubeBrowsers {
+                if (fgExe = exe && fgCls = "Chrome_WidgetWin_1"
+                    && fgTitle != "" && InStr(fgTitle, "YouTube")
+                    && !(exe = "chrome.exe" && InStr(fgTitle, "Gemini")))
+                    return fg
+            }
+        }
+    }
+    ; 2/3. Scan Brave first, then Chrome.
     fallback := 0
     for _i, exe in kYouTubeBrowsers {
         allWins := WinGetList("ahk_exe " . exe)
@@ -343,6 +363,9 @@ $!z:: {
         TrayTip("YouTube window not found in Brave or Chrome.", "CopyURL")
         return
     }
+    pickedExe := ""
+    try pickedExe := WinGetProcessName(hwnd)
+    DebugLog("Picked window exe=" . pickedExe . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
     WinActivate(hwnd)
     if !WinWaitActive(hwnd,, 2) {
         DebugLog("WinWaitActive timed out for hwnd=" . hwnd . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
