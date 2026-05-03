@@ -14,9 +14,9 @@ kVerboseLog := true
 ; Rotate copyurl_log.txt when it exceeds this size (bytes). Set 0 to disable.
 kLogMaxBytes := 524288
 
-; Per-attempt clipboard-update timeout (ms) and number of Alt+X retries before giving up.
-kCopyAttemptTimeoutMs := 1500
-kCopyMaxAttempts := 3
+; Per-attempt clipboard-update timeout (ms) and number of F24 retries per candidate.
+kCopyAttemptTimeoutMs := 1200
+kCopyMaxAttempts := 2
 
 LogPath() {
     return A_ScriptDir "\copyurl_log.txt"
@@ -79,26 +79,24 @@ MK_LBUTTON := 0x1
 kYouTubeBrowsers := ["brave.exe", "chrome.exe"]
 
 /**
- * Find the top-level browser window most likely to be hosting the YouTube
- * tab. Search strategy (in order):
- *   1. Foreground window, if it's one of our browsers AND its active tab
- *      title contains "YouTube" (and isn't the Gemini PWA).
- *   2. WinGetList("ahk_group YTBrowsers") returns matching windows in
- *      Z-order (top = most recently active). Walk that list and return the
- *      FIRST window whose title contains "YouTube" — regardless of which
- *      exe it belongs to. This is the key to "works when YouTube isn't
- *      foreground": MRU order means the YouTube browser the user actually
- *      used most recently wins, even if Brave is currently foreground with
- *      a non-YouTube tab.
- *   3. Fallback: first visible top-level window in Z-order — so the
- *      existing "activate, then check title" flow still surfaces a
- *      useful error.
+ * Return an ordered list of candidate browser windows (most-likely first).
+ * Replaces the old FindYouTubeWindow which returned only one. The Alt+Z
+ * handler walks this list and tries each in turn, so e.g. if Brave is more
+ * recently active but the extension isn't installed there, we automatically
+ * fall through to Chrome's YouTube tab.
  *
- * Chrome's Gemini PWA window is excluded (title contains "Gemini") so we
- * never confuse the source tab with the destination app.
+ * Order:
+ *   1. Foreground window if it's a YouTube browser tab.
+ *   2. All matching windows across both browsers in WinGetList order
+ *      (per-exe Z-order; "YouTube" titles before others).
+ *
+ * Chrome's Gemini PWA window is excluded.
  */
-FindYouTubeWindow() {
+FindYouTubeCandidates() {
     global kYouTubeBrowsers
+    list := []
+    seen := Map()
+
     ; 1. Foreground first.
     fg := WinExist("A")
     if (fg) {
@@ -109,14 +107,18 @@ FindYouTubeWindow() {
             for _i, exe in kYouTubeBrowsers {
                 if (fgExe = exe && fgCls = "Chrome_WidgetWin_1"
                     && fgTitle != "" && InStr(fgTitle, "YouTube")
-                    && !(exe = "chrome.exe" && InStr(fgTitle, "Gemini")))
-                    return fg
+                    && !(exe = "chrome.exe" && InStr(fgTitle, "Gemini"))) {
+                    seen[fg] := true
+                    list.Push({ hwnd: fg, title: fgTitle, exe: exe })
+                    break
+                }
             }
         }
     }
-    ; 2/3. Build a single combined Z-ordered list of all candidate windows
-    ; from every listed browser, then walk it preferring "YouTube" titles.
-    candidates := []
+
+    ; 2. All YouTube-titled windows from each browser, then non-YouTube fallbacks.
+    youtubeOnly := []
+    others := []
     for _i, exe in kYouTubeBrowsers {
         for _j, hwnd in WinGetList("ahk_exe " . exe) {
             try {
@@ -127,22 +129,33 @@ FindYouTubeWindow() {
                     continue
                 if (exe = "chrome.exe" && InStr(title, "Gemini"))
                     continue
-                ; Z-order rank: smaller index in WinGetList for that exe = more recent.
-                ; Combine with exe ordering by appending (i*1000 + j) so each entry
-                ; has a unique sortable key while preserving per-exe Z-order.
-                candidates.Push({ hwnd: hwnd, title: title, exe: exe })
+                if InStr(title, "YouTube")
+                    youtubeOnly.Push({ hwnd: hwnd, title: title, exe: exe })
+                else
+                    others.Push({ hwnd: hwnd, title: title, exe: exe })
             }
         }
     }
-    ; First pass: any candidate whose title contains "YouTube".
-    for _i, c in candidates {
-        if InStr(c.title, "YouTube")
-            return c.hwnd
+    for _i, c in youtubeOnly {
+        if !seen.Has(c.hwnd) {
+            seen[c.hwnd] := true
+            list.Push(c)
+        }
     }
-    ; Last-resort fallback: first candidate at all (preserves prior behavior
-    ; of activating *some* browser window so the "Active tab is not YouTube"
-    ; tray hint can fire).
-    return candidates.Length ? candidates[1].hwnd : 0
+    for _i, c in others {
+        if !seen.Has(c.hwnd) {
+            seen[c.hwnd] := true
+            list.Push(c)
+        }
+    }
+    return list
+}
+
+; Backwards-compatible single-pick wrapper (kept in case anything else calls it).
+FindYouTubeWindow() {
+    cands := FindYouTubeCandidates()
+    return cands.Length ? cands[1].hwnd : 0
+}
 }
 
 FindBraveWindow() {
@@ -372,48 +385,55 @@ $!z:: {
     KeyWait("LAlt", "T0.4")
     KeyWait("RAlt", "T0.4")
 
-    hwnd := FindYouTubeWindow()
-    if !hwnd {
+    candidates := FindYouTubeCandidates()
+    if (candidates.Length = 0) {
         DebugLog("No YouTube-capable browser window found (Brave/Chrome).")
         TrayTip("YouTube window not found in Brave or Chrome.", "CopyURL")
         return
     }
-    pickedExe := ""
-    try pickedExe := WinGetProcessName(hwnd)
-    DebugLog("Picked window exe=" . pickedExe . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
-    WinActivate(hwnd)
-    if !WinWaitActive(hwnd,, 2) {
-        DebugLog("WinWaitActive timed out for hwnd=" . hwnd . " title=" . SubStr(WinGetTitle(hwnd), 1, 160))
-        TrayTip("Could not activate the browser window.", "CopyURL")
-        return
-    }
-    if !ActiveTabIsYouTube(hwnd) {
-        DebugLog("Active browser tab is not YouTube. Title=" . WinGetTitle(hwnd))
-        TrayTip("Active tab is not YouTube. Switch to the YouTube tab and retry.", "CopyURL")
-        return
-    }
-    SendInput("{Escape}")
-    Sleep(120)
+    DebugLog("Candidates: " . candidates.Length)
 
-    ; Retry the copy a few times: hover-resync + Alt+X. Most intermittent
-    ; failures come from a single missed mousemove or the page still settling
-    ; right after WinActivate.
     success := false
-    Loop kCopyMaxAttempts {
-        attempt := A_Index
-        SyncChromiumHoverThorough(hwnd)
+    pickedHwnd := 0
+    pickedExe := ""
+    for _ci, cand in candidates {
+        hwnd := cand.hwnd
+        pickedExe := cand.exe
+        DebugLog("Trying candidate #" . _ci . " exe=" . pickedExe . " title=" . SubStr(cand.title, 1, 160))
+        WinActivate(hwnd)
+        if !WinWaitActive(hwnd,, 2) {
+            DebugLog("WinWaitActive timed out for hwnd=" . hwnd)
+            continue
+        }
+        if !ActiveTabIsYouTube(hwnd) {
+            DebugLog("Active tab is not YouTube. Title=" . WinGetTitle(hwnd))
+            continue
+        }
+        SendInput("{Escape}")
         Sleep(120)
-        DebugLog("Copy attempt " . attempt)
-        if TryCopyOnce(kCopyAttemptTimeoutMs, hwnd) {
-            success := true
-            DebugLog("Copy attempt " . attempt . " succeeded.")
+
+        ; Retry the copy a few times for this candidate.
+        Loop kCopyMaxAttempts {
+            attempt := A_Index
+            SyncChromiumHoverThorough(hwnd)
+            Sleep(120)
+            DebugLog("Copy attempt " . attempt . " on " . pickedExe)
+            if TryCopyOnce(kCopyAttemptTimeoutMs, hwnd) {
+                success := true
+                DebugLog("Copy attempt " . attempt . " on " . pickedExe . " succeeded.")
+                break
+            }
+            DebugLog("Copy attempt " . attempt . " on " . pickedExe . " timed out.")
+            Sleep(120)
+        }
+        if (success) {
+            pickedHwnd := hwnd
             break
         }
-        DebugLog("Copy attempt " . attempt . " timed out.")
-        Sleep(120)
+        DebugLog("Candidate " . pickedExe . " gave up after " . kCopyMaxAttempts . " attempts — falling through to next candidate.")
     }
     if !success {
-        TrayTip("YouTube copy timed out — make sure cursor is over a thumbnail and try again.", "CopyURL")
+        TrayTip("YouTube copy timed out across all browsers — hover a thumbnail and try again.", "CopyURL")
         return
     }
 
