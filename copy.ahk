@@ -92,7 +92,8 @@ VerboseLog(msg) {
  * or "" if no beacon present.
  */
 ReadTitleBeacon(hwnd) {
-    title := WinGetTitle(hwnd)
+    title := ""
+    try title := WinGetTitle(hwnd)
     if (title = "")
         return ""
     if RegExMatch(title, "\[CU:([A-Za-z]+)\]", &m)
@@ -337,7 +338,12 @@ WaitForClipboardUpdate(seqBefore, timeoutMs := 4000) {
 }
 
 ClipboardTextLooksLikeYouTubeUrl(s) {
-    return InStr(s, "youtube.com") && (InStr(s, "watch?v=") || InStr(s, "youtu.be/"))
+    if (s = "")
+        return false
+    ; Accept any URL form content.js can produce (watch, shorts → watch, youtu.be).
+    return InStr(s, "youtube.com/watch?v=")
+        || InStr(s, "youtube.com/shorts/")
+        || InStr(s, "youtu.be/")
 }
 
 FocusGeminiComposer(topHwnd, xFrac, yFrac) {
@@ -499,6 +505,16 @@ $!z:: {
 
     Sleep(60)
     clipUrl := A_Clipboard
+    ; If the clipboard doesn't look right yet, give it a brief grace period —
+    ; another script's clipboard write can race ours by a few ms.
+    if !ClipboardTextLooksLikeYouTubeUrl(clipUrl) {
+        Loop 8 {
+            Sleep(40)
+            clipUrl := A_Clipboard
+            if ClipboardTextLooksLikeYouTubeUrl(clipUrl)
+                break
+        }
+    }
     if !ClipboardTextLooksLikeYouTubeUrl(clipUrl) {
         DebugLog("Clipboard not a YouTube URL: " . SubStr(clipUrl, 1, 120))
         TrayTip("Clipboard does not look like a YouTube URL — copy may have failed.", "CopyURL")
