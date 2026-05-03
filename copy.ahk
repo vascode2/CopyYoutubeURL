@@ -156,7 +156,6 @@ FindYouTubeWindow() {
     cands := FindYouTubeCandidates()
     return cands.Length ? cands[1].hwnd : 0
 }
-}
 
 FindBraveWindow() {
     allWins := WinGetList("ahk_exe brave.exe")
