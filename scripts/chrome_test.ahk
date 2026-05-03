@@ -11,9 +11,15 @@
 ;   4. Reports PASS / FAIL with the URL or timeout reason.
 ;
 ; Run it manually after you have YouTube open in Chrome with thumbnails visible.
-; (Don't run with Brave focused — this is the Chrome regression check.)
+; (Brave is left untouched — this script never activates Brave.)
 ;
 ; Output: prints to a MsgBox AND appends to scripts\chrome_test_log.txt.
+
+; SendLevel 1 so copy.ahk's $!z:: hook (which by default has #InputLevel 0)
+; will accept our synthetic Alt+Z. Without this, AHK silently filters our
+; keys from other AHK scripts' hooks.
+SendLevel 1
+SendMode "Event"
 
 kAttemptCount := 5
 kPerAttemptMs := 4000
