@@ -435,11 +435,19 @@ $!z:: {
     Click(clickX, clickY)
     Sleep(300)
     MouseMove(origX, origY, 0)
-    ; Now the input is focused — select all within it, paste, submit
+    ; Now the input is focused — select all within it, paste, submit.
+    ; Gemini's composer is React-driven: pasted text needs a moment to be
+    ; reflected in component state before Enter is treated as "submit".
+    ; Too short a gap and Enter just inserts a newline (or is ignored).
     SendInput("^a")
-    Sleep(50)
+    Sleep(80)
     SendInput("^v")
-    Sleep(300)
+    Sleep(700)  ; let React commit the paste + enable the send button
+    SendEvent("{Enter}")
+    Sleep(200)
+    ; Belt-and-suspenders: a second Enter via SendInput in case the first
+    ; landed before the composer was ready. If the prompt was already sent,
+    ; a stray Enter in an empty composer is a no-op.
     SendInput("{Enter}")
     A_Clipboard := clipUrl
     DebugLog("Sent to Gemini.")
