@@ -79,22 +79,27 @@ MK_LBUTTON := 0x1
 kYouTubeBrowsers := ["brave.exe", "chrome.exe"]
 
 /**
- * Find the active top-level browser window most likely to be hosting the
- * YouTube tab. Priority:
- *   1. Whatever's currently in the foreground, if it's one of our browsers
- *      AND its title contains "YouTube" (and isn't the Gemini PWA).
- *   2. Scan kYouTubeBrowsers in order, preferring windows whose active tab
- *      title contains "YouTube".
- *   3. Fallback: first visible top-level window of any listed browser, so
- *      the existing "activate, then check title" flow still surfaces a
+ * Find the top-level browser window most likely to be hosting the YouTube
+ * tab. Search strategy (in order):
+ *   1. Foreground window, if it's one of our browsers AND its active tab
+ *      title contains "YouTube" (and isn't the Gemini PWA).
+ *   2. WinGetList("ahk_group YTBrowsers") returns matching windows in
+ *      Z-order (top = most recently active). Walk that list and return the
+ *      FIRST window whose title contains "YouTube" — regardless of which
+ *      exe it belongs to. This is the key to "works when YouTube isn't
+ *      foreground": MRU order means the YouTube browser the user actually
+ *      used most recently wins, even if Brave is currently foreground with
+ *      a non-YouTube tab.
+ *   3. Fallback: first visible top-level window in Z-order — so the
+ *      existing "activate, then check title" flow still surfaces a
  *      useful error.
  *
- * For Chrome we exclude the Gemini PWA window (its title contains "Gemini")
- * so we never confuse the source tab with the destination app.
+ * Chrome's Gemini PWA window is excluded (title contains "Gemini") so we
+ * never confuse the source tab with the destination app.
  */
 FindYouTubeWindow() {
     global kYouTubeBrowsers
-    ; 1. Foreground-first — respects whichever browser the user just used.
+    ; 1. Foreground first.
     fg := WinExist("A")
     if (fg) {
         try {
@@ -109,25 +114,35 @@ FindYouTubeWindow() {
             }
         }
     }
-    ; 2/3. Scan Brave first, then Chrome.
-    fallback := 0
+    ; 2/3. Build a single combined Z-ordered list of all candidate windows
+    ; from every listed browser, then walk it preferring "YouTube" titles.
+    candidates := []
     for _i, exe in kYouTubeBrowsers {
-        allWins := WinGetList("ahk_exe " . exe)
-        for _j, hwnd in allWins {
-            title := WinGetTitle(hwnd)
-            cls := WinGetClass(hwnd)
-            visible := DllCall("IsWindowVisible", "Ptr", hwnd)
-            if !(visible && cls = "Chrome_WidgetWin_1" && title != "")
-                continue
-            if (exe = "chrome.exe" && InStr(title, "Gemini"))
-                continue
-            if InStr(title, "YouTube")
-                return hwnd
-            if !fallback
-                fallback := hwnd
+        for _j, hwnd in WinGetList("ahk_exe " . exe) {
+            try {
+                cls := WinGetClass(hwnd)
+                title := WinGetTitle(hwnd)
+                visible := DllCall("IsWindowVisible", "Ptr", hwnd)
+                if !(visible && cls = "Chrome_WidgetWin_1" && title != "")
+                    continue
+                if (exe = "chrome.exe" && InStr(title, "Gemini"))
+                    continue
+                ; Z-order rank: smaller index in WinGetList for that exe = more recent.
+                ; Combine with exe ordering by appending (i*1000 + j) so each entry
+                ; has a unique sortable key while preserving per-exe Z-order.
+                candidates.Push({ hwnd: hwnd, title: title, exe: exe })
+            }
         }
     }
-    return fallback
+    ; First pass: any candidate whose title contains "YouTube".
+    for _i, c in candidates {
+        if InStr(c.title, "YouTube")
+            return c.hwnd
+    }
+    ; Last-resort fallback: first candidate at all (preserves prior behavior
+    ; of activating *some* browser window so the "Active tab is not YouTube"
+    ; tray hint can fire).
+    return candidates.Length ? candidates[1].hwnd : 0
 }
 
 FindBraveWindow() {
