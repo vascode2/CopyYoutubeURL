@@ -15,8 +15,40 @@ kVerboseLog := true
 kLogMaxBytes := 524288
 
 ; Per-attempt clipboard-update timeout (ms) and number of F24 retries per candidate.
-kCopyAttemptTimeoutMs := 1200
+; A successful copy returns in ~30 ms (see logs). 800 ms is plenty for a real
+; round-trip; if we hit timeout it almost certainly means the extension isn't
+; listening on this browser, in which case more retries don't help.
+kCopyAttemptTimeoutMs := 800
 kCopyMaxAttempts := 2
+; If the first attempt on a candidate returns beacon=none (extension didn't
+; even fire), skip the remaining retries on that candidate and fall through
+; to the next browser immediately. This is the main speed-up when one
+; browser doesn't have the extension installed.
+kFastFailOnNoBeacon := true
+
+; File where we cache the exe of the most recent successful copy. Tried first
+; on subsequent invocations so a working browser doesn't get stuck behind a
+; non-working one in Z-order.
+LastWinnerPath() {
+    return A_ScriptDir "\copyurl_last_winner.txt"
+}
+ReadLastWinner() {
+    p := LastWinnerPath()
+    if !FileExist(p)
+        return ""
+    try {
+        s := Trim(FileRead(p))
+        return s
+    }
+    return ""
+}
+WriteLastWinner(exe) {
+    p := LastWinnerPath()
+    try {
+        try FileDelete(p)
+        FileAppend(exe, p)
+    }
+}
 
 LogPath() {
     return A_ScriptDir "\copyurl_log.txt"
@@ -97,6 +129,9 @@ FindYouTubeCandidates() {
     list := []
     seen := Map()
 
+    ; 0. Sticky preference: if a browser worked last time, try it first.
+    lastExe := ReadLastWinner()
+
     ; 1. Foreground first.
     fg := WinExist("A")
     if (fg) {
@@ -116,7 +151,7 @@ FindYouTubeCandidates() {
         }
     }
 
-    ; 2. All YouTube-titled windows from each browser, then non-YouTube fallbacks.
+    ; 2. Collect all YouTube-titled windows from each browser, then non-YouTube fallbacks.
     youtubeOnly := []
     others := []
     for _i, exe in kYouTubeBrowsers {
@@ -136,11 +171,29 @@ FindYouTubeCandidates() {
             }
         }
     }
-    for _i, c in youtubeOnly {
-        if !seen.Has(c.hwnd) {
-            seen[c.hwnd] := true
-            list.Push(c)
-        }
+
+    ; Within YouTube-titled candidates, push lastExe-matching ones first.
+    if (lastExe != "") {
+        priority := []
+        rest := []
+        for _i, c in youtubeOnly
+            (c.exe = lastExe ? priority : rest).Push(c)
+        for _i, c in priority
+            if !seen.Has(c.hwnd) {
+                seen[c.hwnd] := true
+                list.Push(c)
+            }
+        for _i, c in rest
+            if !seen.Has(c.hwnd) {
+                seen[c.hwnd] := true
+                list.Push(c)
+            }
+    } else {
+        for _i, c in youtubeOnly
+            if !seen.Has(c.hwnd) {
+                seen[c.hwnd] := true
+                list.Push(c)
+            }
     }
     for _i, c in others {
         if !seen.Has(c.hwnd) {
@@ -360,17 +413,16 @@ TryCopyOnce(timeoutMs, hwnd := 0) {
         }
         if (ClipboardSequence() != seqBefore) {
             VerboseLog("clip_changed elapsed=" . (A_TickCount - tStart) . " beacon=" . beaconSeen)
-            return true
+            return { ok: true, beacon: beaconSeen }
         }
         if (A_TickCount >= deadline) {
-            ; Last-chance beacon read after timeout (in case it appeared late).
             if (hwnd && beaconSeen = "") {
                 b := ReadTitleBeacon(hwnd)
                 if (b != "")
                     beaconSeen := b
             }
             VerboseLog("clip_timeout elapsed=" . (A_TickCount - tStart) . " beacon=" . (beaconSeen = "" ? "none" : beaconSeen))
-            return false
+            return { ok: false, beacon: beaconSeen }
         }
         Sleep(25)
     }
@@ -412,24 +464,33 @@ $!z:: {
         Sleep(120)
 
         ; Retry the copy a few times for this candidate.
+        candFailedFast := false
         Loop kCopyMaxAttempts {
             attempt := A_Index
             SyncChromiumHoverThorough(hwnd)
             Sleep(120)
             DebugLog("Copy attempt " . attempt . " on " . pickedExe)
-            if TryCopyOnce(kCopyAttemptTimeoutMs, hwnd) {
+            res := TryCopyOnce(kCopyAttemptTimeoutMs, hwnd)
+            if (res.ok) {
                 success := true
                 DebugLog("Copy attempt " . attempt . " on " . pickedExe . " succeeded.")
                 break
             }
-            DebugLog("Copy attempt " . attempt . " on " . pickedExe . " timed out.")
+            DebugLog("Copy attempt " . attempt . " on " . pickedExe . " timed out (beacon=" . (res.beacon = "" ? "none" : res.beacon) . ").")
+            ; Fast-fail: if extension didn't fire at all (beacon=none),
+            ; further retries on the same browser won't help.
+            if (kFastFailOnNoBeacon && res.beacon = "") {
+                candFailedFast := true
+                break
+            }
             Sleep(120)
         }
         if (success) {
             pickedHwnd := hwnd
+            WriteLastWinner(pickedExe)
             break
         }
-        DebugLog("Candidate " . pickedExe . " gave up after " . kCopyMaxAttempts . " attempts — falling through to next candidate.")
+        DebugLog("Candidate " . pickedExe . " " . (candFailedFast ? "fast-failed (beacon=none)" : "gave up after " . kCopyMaxAttempts . " attempts") . " — falling through to next candidate.")
     }
     if !success {
         TrayTip("YouTube copy timed out across all browsers — hover a thumbnail and try again.", "CopyURL")
