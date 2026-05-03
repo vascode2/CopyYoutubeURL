@@ -95,8 +95,19 @@ for _i, px in xs {
         MouseMove(px, py, 0)
         Sleep(450)  ; let YouTube register the hover
 
+        ; Re-assert Chrome focus before each attempt — copy.ahk relies on the
+        ; foreground window for browser auto-detect.
+        if (WinExist("A") != hwnd) {
+            WinActivate(hwnd)
+            WinWaitActive(hwnd,, 1)
+            Sleep(200)
+        }
+
         seqBefore := ClipboardSeq()
-        SendInput("!z")
+        ; SendEvent (not SendInput): SendInput temporarily disables other AHK
+        ; scripts' keyboard hooks, so copy.ahk would never see the Alt+Z.
+        ; SendEvent goes through the normal input queue and IS visible to hooks.
+        SendEvent("{Alt down}z{Alt up}")
         ok := WaitForClipboardChange(seqBefore, kPerAttemptMs)
         if (ok) {
             Sleep(120)
