@@ -5,7 +5,7 @@ kGeminiInputXFrac := 0.5
 kGeminiInputYFrac := 0.92
 
 ; Text before the URL in Gemini (Alt+Z). "" = URL only. Clipboard is restored to the plain URL after send.
-kGeminiPastePrefix := "Summarize this YouTube video:`n"
+kGeminiPastePrefix := ""
 
 ; Set true to append diagnostic lines to copyurl_log.txt next to this script.
 kDebugLog := true
