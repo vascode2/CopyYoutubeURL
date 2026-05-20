@@ -2,6 +2,27 @@
 
 > Living handoff doc. Update at every phase boundary. Future agent sessions should read this first.
 
+## ⚠️ Runtime location of copy.ahk (read this first)
+The user runs [copy.ahk](copy.ahk) from the **Windows Startup folder**, not from this repo. After every edit to the workspace copy you MUST mirror it to:
+
+```
+C:\Users\Yoon\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\copy.ahk
+```
+
+and verify by SHA256 match. The running log [copyurl_log.txt](copyurl_log.txt) also lives next to that Startup copy (`A_ScriptDir`), not in this repo — read it from the Startup folder when diagnosing. Reload after copying: tray icon → Reload Script (workspace `copyurl_log.txt` will usually be absent/stale).
+
+PowerShell one-liner (validate → sync → hash-check):
+
+```powershell
+& "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" /ErrorStdOut /validate "g:\My Drive\Projects\CopyYoutubeURL\copy.ahk"
+if ($LASTEXITCODE -eq 0) {
+    Copy-Item "g:\My Drive\Projects\CopyYoutubeURL\copy.ahk" `
+              "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\copy.ahk" -Force
+    (Get-FileHash "g:\My Drive\Projects\CopyYoutubeURL\copy.ahk" -Algorithm SHA256).Hash
+    (Get-FileHash "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\copy.ahk" -Algorithm SHA256).Hash
+}
+```
+
 ## What this project does
 Hover a YouTube thumbnail in Brave/Chrome → press **Alt+Z** (only user-facing hotkey) → AutoHotkey activates the YouTube window, sends **F24** inside the tab as the internal extension trigger (F24 chosen to avoid collision with other tools' global hotkeys, e.g. CopyAnkitoChatGPT owns Alt+X), the extension copies the hovered video's URL to the OS clipboard, then AHK switches to the Gemini Chrome app and pastes a "Summarize this YouTube video:" prompt + URL and presses Enter.
 
@@ -45,7 +66,10 @@ No background script, no native messaging, no host permissions beyond the YouTub
 After every F24 keydown the extension processes, it appends ` ​[CU:STATE]` (zero-width-space + tag) to `document.title` for ~300 ms, then restores. STATE ∈ `ok | null | execfail | asyncok | asyncfail`. AHK reads via `WinGetTitle` immediately after sending F24 and parses the tag with `RegExMatch`.
 
 ## Current status
-- Phase 0 + Phase 1 implemented (this update).
+- Phase 0 + Phase 1 implemented.
+- Gemini click path now cursorless: `PostClickAtScreen` posts `WM_MOUSEMOVE` + `WM_LBUTTONDOWN/UP` directly to the largest `Chrome_RenderWidgetHostHWND` (no `Click()` / `MouseMove`). OS cursor stays put through the entire flow.
+- Composer Y is found via native `PixelSearch` (BitBlt) instead of a per-pixel `PixelGetColor` loop — scan dropped from ~11 s to <200 ms on the user's display.
+- `#MaxThreadsBuffer true` so a second Alt+Z press while the first handler is still running gets queued instead of dropped.
 - Awaiting first stress-harness run.
 
 ## Next steps (resume here)

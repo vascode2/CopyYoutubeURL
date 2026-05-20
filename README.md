@@ -12,7 +12,7 @@
 
 1. Open **YouTube** in **Google Chrome** (or **Brave**) with this extension enabled.
 2. Point at the **thumbnail** of the video you care about — the extension remembers which video that is.
-3. Press **Alt+Z** (with **AutoHotkey v2** and **`copy.ahk`** on Windows). The script briefly brings the YouTube window forward, copies that video's **YouTube URL**, switches to the **Gemini** app, clicks the composer input, pastes a short "summarize" line plus the link, and sends it. Afterward the **clipboard is set back to the plain URL**. The cursor briefly moves to click the Gemini input field, then returns to its original position.
+3. Press **Alt+Z** (with **AutoHotkey v2** and **`copy.ahk`** on Windows). The script briefly brings the YouTube window forward, copies that video's **YouTube URL**, switches to the **Gemini** app, focuses the composer input, pastes a short "summarize" line plus the link, and sends it. Afterward the **clipboard is set back to the plain URL**. The OS mouse cursor never moves — the click is posted directly to the Chromium render widget.
 4. **Gemini** replies with a **summary** (and you can follow up in the same chat).
 
 **Why this works:** **Gemini** can use a **YouTube URL** as real video context for summaries and Q&A. Many other assistants only treat links as plain text.

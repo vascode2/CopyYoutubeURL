@@ -53,3 +53,12 @@ AHK reads the title right after Alt+X and logs it.
 2. Reload AHK (tray → Reload Script).
 3. Refresh YouTube tab.
 4. Hover thumbnail, retry Alt+Z.
+
+## Gemini composer focus (cursorless click)
+The Gemini click is sent via `PostClickAtScreen` — it converts the screen coord to render-widget client coords with `ScreenToClient` and posts `WM_MOUSEMOVE` + `WM_LBUTTONDOWN/UP` to the largest `Chrome_RenderWidgetHostHWND`. The OS cursor doesn't move.
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Paste lands in the wrong app / nothing focused | Render widget not found, or Gemini window changed class | Check log for `gemini_scan_pixelsearch_miss`; verify `WinGetClass` of Gemini still resolves a `Chrome_RenderWidgetHostHWND` child. |
+| `Gemini pass1 layout=active(fallback)` on a new chat | Composer color not in candidate list `[0x2A2B2D, 0x1F2022, 0x303134, 0x252628]` | Add the actual `gemini_bottom_pixel=0x...` value from the log to `composerColors` in `FindGeminiComposerScreenY`. |
+| Click registers but composer never focuses | Heavy JS frame intercepting posted-message clicks | Last-resort fallback: revert that one section to `Click()` + immediate `MouseMove` restore. |

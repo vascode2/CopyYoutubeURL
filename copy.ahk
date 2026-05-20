@@ -1,8 +1,14 @@
 #Requires AutoHotkey v2.0
 
+; Buffer one extra Alt+Z press while a handler is running (otherwise it's silently dropped
+; on a slow Gemini activation, which makes consecutive copies look like "the wrong URL pasted").
+#MaxThreadsBuffer true
+
 ; Gemini composer target (fractions of top-level Chrome PWA client size). Tune if posted click misses "Ask Gemini".
 kGeminiInputXFrac := 0.5
 kGeminiInputYFrac := 0.92
+; On a brand-new Gemini chat the composer is vertically centered (~0.54), not pinned to the bottom.
+kGeminiNewChatYFrac := 0.54
 
 ; Text before the URL in Gemini (Alt+Z). "" = URL only. Clipboard is restored to the plain URL after send.
 kGeminiPastePrefix := "한국말로 요약해줘 - "
@@ -281,6 +287,27 @@ PostLClick(renderHwnd, cx, cy) {
 }
 
 /**
+ * Click at a screen coordinate by posting WM_MOUSEMOVE + WM_LBUTTONDOWN/UP
+ * directly to the Chromium render widget — no OS cursor movement.
+ */
+PostClickAtScreen(topHwnd, sx, sy) {
+    render := ChromeLargestRenderHwnd(topHwnd)
+    if !render
+        return false
+    pt := Buffer(8, 0)
+    NumPut("Int", sx, pt, 0)
+    NumPut("Int", sy, pt, 4)
+    if !DllCall("ScreenToClient", "Ptr", render, "Ptr", pt)
+        return false
+    cx := NumGet(pt, 0, "Int")
+    cy := NumGet(pt, 4, "Int")
+    PostMouseMove(render, cx, cy)
+    Sleep(10)
+    PostLClick(render, cx, cy)
+    return true
+}
+
+/**
  * Map a point from top-level Chromium client coords to Chrome_RenderWidgetHostHWND client coords.
  */
 ParentClientToRenderClient(parentHwnd, renderHwnd, pcx, pcy) {
@@ -316,6 +343,82 @@ SyncChromiumHoverAtCursor(topHwnd) {
     if !render
         return false
     return PostMouseMoveAtCursor(render)
+}
+
+/**
+ * Real OS-level cursor jitter (1 px out and back). PostMessage(WM_MOUSEMOVE) is
+ * enough for Chromium's input plumbing in most cases, but YouTube's hover
+ * state (and thus content.js `hoveredVideoUrl`) sometimes requires a genuine
+ * OS mouse event to update after a foreground-window switch. The visible
+ * cursor only moves 1 px and snaps back, so it's effectively invisible.
+ */
+RealMouseJitter() {
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&cx0, &cy0)
+    MouseMove(cx0 + 1, cy0, 0)
+    Sleep(15)
+    MouseMove(cx0, cy0, 0)
+}
+
+/**
+ * Locate the Gemini "Ask Gemini" composer's vertical center by scanning a
+ * vertical line at the window's horizontal middle for the composer's medium-
+ * dark gray fill. Works for both new-chat (centered composer) and active-chat
+ * (bottom-pinned composer) layouts.
+ *
+ * Returns the screen Y to click, or 0 if not found (caller should fall back).
+ */
+FindGeminiComposerScreenY(gemHwnd, clickX) {
+    WinGetPos(&wx, &wy, &ww, &wh, gemHwnd)
+    yTop := wy + Round(wh * 0.30)
+    yBottom := wy + wh - 20
+    CoordMode("Pixel", "Screen")
+    ; Strategy: AHK's PixelSearch is implemented as a single native BitBlt +
+    ; in-memory scan (microseconds), vs PixelGetColor which is ~15-20 ms per
+    ; call (a 600-pixel loop = ~10 s on this machine — the symptom we just
+    ; diagnosed). We do a small set of PixelSearch calls for plausible
+    ; composer-gray shades to find the top edge, then a few PixelGetColor
+    ; samples downward to confirm a tall enough run.
+    composerColors := [0x2A2B2D, 0x1F2022, 0x303134, 0x252628]
+    foundX := 0
+    foundTop := 0
+    for _, col in composerColors {
+        try {
+            if PixelSearch(&foundX, &foundTop, clickX, yTop, clickX, yBottom, col, 12)
+                break
+        }
+        foundTop := 0
+    }
+    if (foundTop = 0) {
+        VerboseLog("gemini_scan_pixelsearch_miss yTop=" . yTop . " yBottom=" . yBottom)
+        return 0
+    }
+    ; Confirm + measure bottom edge with sparse downward samples.
+    composerBot := foundTop
+    y := foundTop + 4
+    while (y <= yBottom && (y - foundTop) < 240) {
+        isGray := false
+        try {
+            px := PixelGetColor(clickX, y, "RGB")
+            r := (px >> 16) & 0xFF
+            g := (px >> 8) & 0xFF
+            b := px & 0xFF
+            if (r >= 0x16 && r <= 0x80 && g >= 0x16 && g <= 0x80 && b >= 0x16 && b <= 0x80
+                && Abs(r - g) < 0x18 && Abs(g - b) < 0x18 && Abs(r - b) < 0x18
+                && Max(r, g, b) >= 0x1C)
+                isGray := true
+        }
+        if (!isGray)
+            break
+        composerBot := y
+        y += 6
+    }
+    runLen := composerBot - foundTop
+    if (runLen < 20) {
+        VerboseLog("gemini_scan_short_run foundTop=" . foundTop . " runLen=" . runLen)
+        return 0
+    }
+    return Round((foundTop + composerBot) / 2)
 }
 
 ClipboardSequence() {
@@ -398,6 +501,32 @@ ActiveTabIsYouTube(hwnd) {
 }
 
 /**
+ * Resolve where to click in the Gemini window. Tries the pixel scan first; if
+ * that fails, falls back to a title-based new-vs-active heuristic with a pixel
+ * sanity check at the bottom-composer spot. Returns {y, tag}.
+ */
+ResolveGeminiClickY(gemHwnd, clickX, bottomY, centerY) {
+    foundY := FindGeminiComposerScreenY(gemHwnd, clickX)
+    if (foundY > 0)
+        return { y: foundY, tag: "scan" }
+    gemTitle := ""
+    try gemTitle := WinGetTitle(gemHwnd)
+    isNewChat := InStr(gemTitle, "Gemini") && !InStr(gemTitle, " - ")
+    try {
+        CoordMode("Pixel", "Screen")
+        px := PixelGetColor(clickX, bottomY, "RGB")
+        r := (px >> 16) & 0xFF
+        g := (px >> 8) & 0xFF
+        b := px & 0xFF
+        maxCh := Max(r, g, b)
+        if (maxCh < 0x18)
+            isNewChat := true
+        VerboseLog("gemini_bottom_pixel=" . Format("0x{:06X}", px) . " maxCh=" . maxCh)
+    }
+    return { y: isNewChat ? centerY : bottomY, tag: isNewChat ? "new(fallback)" : "active(fallback)" }
+}
+
+/**
  * One trigger attempt with its own clipboard-sequence wait. Returns true if the
  * extension wrote a fresh clipboard value within timeoutMs.
  *
@@ -467,12 +596,19 @@ $!z:: {
             continue
         }
         SendInput("{Escape}")
-        Sleep(120)
+        Sleep(200)
 
         ; Retry the copy a few times for this candidate.
         candFailedFast := false
         Loop kCopyMaxAttempts {
             attempt := A_Index
+            ; Real OS-level mouse nudge so YouTube actually fires pointermove
+            ; into content.js after the foreground switch (synthetic
+            ; PostMessage isn't always enough to refresh hoveredVideoUrl).
+            RealMouseJitter()
+            Sleep(40)
+            SyncChromiumHoverThorough(hwnd)
+            Sleep(60)
             SyncChromiumHoverThorough(hwnd)
             Sleep(120)
             DebugLog("Copy attempt " . attempt . " on " . pickedExe)
@@ -523,35 +659,67 @@ $!z:: {
     DebugLog("Got URL: " . clipUrl)
     if (kGeminiPastePrefix != "")
         A_Clipboard := kGeminiPastePrefix . clipUrl
+    VerboseLog("stage:find_gemini")
     gemHwnd := FindGeminiWindow()
     if !gemHwnd {
         DebugLog("Gemini window not found; left URL on clipboard.")
         A_Clipboard := clipUrl
         return
     }
+    VerboseLog("stage:activate_gemini hwnd=" . gemHwnd)
+    tAct := A_TickCount
     WinActivate(gemHwnd)
     if !WinWaitActive(gemHwnd,, 2) {
-        DebugLog("WinWaitActive(Gemini) timed out.")
+        DebugLog("WinWaitActive(Gemini) timed out after " . (A_TickCount - tAct) . " ms.")
         A_Clipboard := clipUrl
         return
     }
-    ; Real click on the "Ask Gemini" input field at bottom-center of window.
-    ; PostMessage fake clicks don't trigger Chrome JS event handlers — real Click does.
-    Sleep(200)
+    VerboseLog("stage:gemini_active elapsed=" . (A_TickCount - tAct))
+    ; Real click on the "Ask Gemini" input field. Composer position depends on
+    ; chat state (new = centered, active = pinned to bottom) AND DPI, so the
+    ; only reliable approach is to find the composer's medium-gray fill via
+    ; pixel scan along the window's vertical center. Falls back to layout
+    ; heuristics only if the scan finds nothing.
+    ;
+    ; Why two scan-and-click passes: on a freshly-activated PWA the composer
+    ; can still be animating into position, so the first scan may report a
+    ; slightly different Y than the final rendered position. A second pass
+    ; ~200 ms later catches the settled layout. Two clicks on the same
+    ; composer is harmless (just re-sets caret).
+    Sleep(350)
+    VerboseLog("stage:pre_scan")
     WinGetPos(&wx, &wy, &ww, &wh, gemHwnd)
     clickX := wx + Round(ww * 0.5)
-    clickY := wy + wh - 60
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&origX, &origY)
-    Click(clickX, clickY)
-    Sleep(300)
-    MouseMove(origX, origY, 0)
+    bottomY := wy + wh - 60
+    centerY := wy + Round(wh * kGeminiNewChatYFrac)
+
+    ; Pass 1 — post click directly to render widget; OS cursor never moves.
+    tScan := A_TickCount
+    r1 := ResolveGeminiClickY(gemHwnd, clickX, bottomY, centerY)
+    DebugLog("Gemini pass1 layout=" . r1.tag . " clickY=" . r1.y . " wy=" . wy . " wh=" . wh . " scanMs=" . (A_TickCount - tScan))
+    PostClickAtScreen(gemHwnd, clickX, r1.y)
+    Sleep(180)
+
+    ; Pass 2 — re-scan in case composer animated/settled.
+    tScan2 := A_TickCount
+    r2 := ResolveGeminiClickY(gemHwnd, clickX, bottomY, centerY)
+    if (r2.y != r1.y || r2.tag != r1.tag)
+        DebugLog("Gemini pass2 layout=" . r2.tag . " clickY=" . r2.y . " (changed from pass1) scanMs=" . (A_TickCount - tScan2))
+    PostClickAtScreen(gemHwnd, clickX, r2.y)
+    Sleep(80)
+    VerboseLog("stage:pre_paste")
     ; Now the input is focused — select all within it, paste, submit.
     ; Gemini's composer is React-driven: pasted text needs a moment to be
     ; reflected in component state before Enter is treated as "submit".
     ; Too short a gap and Enter just inserts a newline (or is ignored).
     SendInput("^a")
     Sleep(80)
+    ; Re-assert clipboard right before paste in case anything raced it.
+    if (kGeminiPastePrefix != "")
+        A_Clipboard := kGeminiPastePrefix . clipUrl
+    else
+        A_Clipboard := clipUrl
+    Sleep(40)
     SendInput("^v")
     Sleep(700)  ; let React commit the paste + enable the send button
     SendEvent("{Enter}")
