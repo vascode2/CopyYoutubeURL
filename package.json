@@ -1,5 +1,5 @@
 {
-  "name": "copyyoutubeurl",
+  "name": "yt-to-gemini-summarizer-helper",
   "version": "1.2.8",
   "private": true,
   "description": "Hover a YouTube thumbnail and copy/summarize its URL into Gemini.",
